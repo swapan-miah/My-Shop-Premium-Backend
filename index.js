@@ -55,6 +55,7 @@ async function run() {
     const due_Collection = database.collection("due");
     const due_payment_Collection = database.collection("due-payment-history");
     const cost_Collection = database.collection("cost-history");
+    const payment_Collection = database.collection("payment-history");
 
     // find all products
     app.get("/products", async (req, res) => {
@@ -577,75 +578,79 @@ async function run() {
     // sale_history_this_day for my cash
     app.get("/summary", async (req, res) => {
       try {
-        const queryDate = req.query?.date;
+        const crose_maching_backend_key = process.env.Front_Backend_Key;
+        const crose_maching_frontend_key =
+          req.headers.authorization?.split(" ")[1];
+        if (crose_maching_backend_key === crose_maching_frontend_key) {
+          const queryDate = req.query?.date;
 
-        if (!queryDate) {
-          return res
-            .status(400)
-            .send({ message: "Date query parameter is required" });
+          if (!queryDate) {
+            return res
+              .status(400)
+              .send({ message: "Date query parameter is required" });
+          }
+
+          const query = { date: queryDate };
+
+          const sell_his_result = await sells_history_Collection
+            .find(query)
+            .toArray();
+
+          const due_payment_res = await due_payment_Collection
+            .find(query)
+            .toArray();
+
+          const cost_list = await cost_Collection.find(query).toArray();
+
+          // calculate profit from sell
+          const totalSellsProfit = sell_his_result.length
+            ? sell_his_result.reduce((acc, sell) => {
+                const allProductsProfit = sell.products.reduce(
+                  (productAcc, product) => productAcc + product.profit,
+                  0
+                );
+                return acc + allProductsProfit;
+              }, 0)
+            : 0;
+
+          const overallDue = sell_his_result.length
+            ? sell_his_result.reduce((acc, item) => acc + Number(item.due), 0)
+            : 0;
+
+          const overallPaid = sell_his_result.length
+            ? sell_his_result.reduce((acc, item) => acc + Number(item?.paid), 0)
+            : 0;
+
+          const overallSubTotal = sell_his_result.length
+            ? sell_his_result.reduce((acc, item) => acc + item.subTotal, 0)
+            : 0;
+
+          // overall Paid From Due history collection
+          const overallPaidFromDue = due_payment_res.length
+            ? due_payment_res.reduce((acc, item) => acc + Number(item?.paid), 0)
+            : 0;
+
+          // cost collection
+          const allCost = cost_list.length
+            ? cost_list.reduce((acc, item) => acc + Number(item?.amount), 0)
+            : 0;
+
+          const sell_summary = {
+            profit: totalSellsProfit,
+            due: overallDue,
+            paid: overallPaid,
+            subTotal: overallSubTotal,
+            duePayment: overallPaidFromDue,
+            totalCost: allCost,
+          };
+
+          // Sending results in reverse order for better user experience
+          res.send(sell_summary);
+        } else {
+          res.status(403).send({
+            message: "Forbidden: Invalid Key",
+          });
         }
-
-        const query = { date: queryDate };
-
-        const sell_his_result = await sells_history_Collection
-          .find(query)
-          .toArray();
-
-        const due_payment_res = await due_payment_Collection
-          .find(query)
-          .toArray();
-
-        console.log(due_payment_res);
-
-        const cost_list = await cost_Collection.find(query).toArray();
-        // console.log(cost_list);
-
-        // calculate profit from sell
-        const totalSellsProfit = sell_his_result.length
-          ? sell_his_result.reduce((acc, sell) => {
-              const allProductsProfit = sell.products.reduce(
-                (productAcc, product) => productAcc + product.profit,
-                0
-              );
-              return acc + allProductsProfit;
-            }, 0)
-          : 0;
-
-        const overallDue = sell_his_result.length
-          ? sell_his_result.reduce((acc, item) => acc + Number(item.due), 0)
-          : 0;
-
-        const overallPaid = sell_his_result.length
-          ? sell_his_result.reduce((acc, item) => acc + Number(item?.paid), 0)
-          : 0;
-
-        const overallSubTotal = sell_his_result.length
-          ? sell_his_result.reduce((acc, item) => acc + item.subTotal, 0)
-          : 0;
-
-        // overall Paid From Due history collection
-        const overallPaidFromDue = due_payment_res.length
-          ? due_payment_res.reduce((acc, item) => acc + Number(item?.paid), 0)
-          : 0;
-
-        // console.log(overallPaidFromDue);
-
-        // cost collection
-        const allCost = cost_list.length
-          ? cost_list.reduce((acc, item) => acc + Number(item?.amount), 0)
-          : 0;
-
-        const sell_summary = {
-          profit: totalSellsProfit,
-          due: overallDue,
-          paid: overallPaid,
-          subTotal: overallSubTotal,
-          duePayment: overallPaidFromDue,
-          totalCost: allCost,
-        };
-
-        // Sending results in reverse order for better user experience
-        res.send(sell_summary);
       } catch (error) {
         res.status(500).send({
           message: "An error occurred",
@@ -673,6 +678,39 @@ async function run() {
 
           const result = await cost_Collection.find(query).toArray();
           res.send(result);
+        } else {
+          res.status(403).send({
+            message: "Forbidden: Invalid Key",
+          });
+        }
+      } catch (error) {
+        res.status(500).send({
+          message: "An error occurred while fetching data.",
+          error,
+        });
+      }
+    });
+
+    // find all products
+    app.get("/payment-list", async (req, res) => {
+      try {
+        const crose_maching_backend_key = process.env.Front_Backend_Key;
+        const crose_maching_frontend_key =
+          req.headers.authorization?.split(" ")[1];
+
+        if (crose_maching_backend_key === crose_maching_frontend_key) {
+          const queryDate = req.query?.date;
+
+          if (!queryDate) {
+            return res
+              .status(400)
+              .send({ message: "Date query parameter is required" });
+          }
+          const query = { date: queryDate };
+
+          const result = await payment_Collection.find(query).toArray();
+          const reverseResult = result.reverse();
+          res.send(reverseResult);
         } else {
           res.status(403).send({
             message: "Forbidden: Invalid Key",
@@ -868,7 +906,8 @@ async function run() {
           const storeItem = req.body;
 
           // Remove crose_maching_key from storeItem
-          const { crose_maching_key, products, ...storeData } = storeItem;
+          const { crose_maching_key, products, bikash, cash, ...storeData } =
+            storeItem;
 
           // Filter out products with quantity 0
           const filteredProducts = products.filter(
@@ -942,6 +981,20 @@ async function run() {
             }
           }
 
+          const payment_length =
+            (await payment_Collection.find({}).toArray()).length || 0;
+
+          const paymentInfo = {
+            si: payment_length + 1,
+            invoice_no: new_invoice,
+            bikash: Number(req.body?.bikash),
+            cash: Number(req.body?.cash),
+            date: req.body?.date,
+          };
+          const paymentInsertResult = await payment_Collection.insertOne(
+            paymentInfo
+          );
+
           if (req.body?.due) {
             const dueInfo = {
               invoice_no: new_invoice,
@@ -1014,6 +1067,21 @@ async function run() {
           } else {
             const result = await due_Collection.deleteOne(modify_query);
           }
+
+          const payment_length =
+            (await payment_Collection.find({}).toArray()).length || 0;
+
+          const paymentInfo = {
+            si: payment_length + 1,
+            invoice_no: new_invoice,
+            bikash: Number(req.body?.bikash),
+            cash: Number(req.body?.cash),
+            date: dateOnly,
+          };
+
+          const paymentInsertResult = await payment_Collection.insertOne(
+            paymentInfo
+          );
 
           const due_payment_history_info = {
             new_invoice_no: new_invoice,
