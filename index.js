@@ -57,6 +57,14 @@ async function run() {
     const cost_Collection = database.collection("cost-history");
     const payment_Collection = database.collection("payment-history");
 
+    //------------- find admin by login email
+    app.get("/users/admin/:email", async (req, res) => {
+      const email = req.params.email;
+      const query = { userEmail: email };
+      const user = await usersCollection.findOne(query);
+      res.send({ isAdmin: user?.role == "admin" });
+    });
+
     // find all products
     app.get("/products", async (req, res) => {
       try {
