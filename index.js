@@ -376,27 +376,27 @@ async function run() {
     // find Store collection
     app.get("/sells-history", async (req, res) => {
       try {
-        const crose_maching_backend_key = process.env.Front_Backend_Key;
-        const crose_maching_frontend_key =
-          req.headers.authorization?.split(" ")[1];
+        // const crose_maching_backend_key = process.env.Front_Backend_Key;
+        // const crose_maching_frontend_key =
+        //   req.headers.authorization?.split(" ")[1];
 
-        if (crose_maching_backend_key === crose_maching_frontend_key) {
-          const date = req.query.date; // req.query থেকে date নেয়া হচ্ছে
-          const query = { date: date };
+        // if (crose_maching_backend_key === crose_maching_frontend_key) {
+        const date = req.query.date; // req.query থেকে date নেয়া হচ্ছে
+        const query = { date: date };
 
-          console.log("query", query);
+        console.log("query", query);
 
-          // ডেটা ডাটাবেজ থেকে ফেচ করা হচ্ছে
-          const result = (
-            await sells_history_Collection.find(query).toArray()
-          ).reverse();
+        // ডেটা ডাটাবেজ থেকে ফেচ করা হচ্ছে
+        const result = (
+          await sells_history_Collection.find(query).toArray()
+        ).reverse();
 
-          res.send(result);
-        } else {
-          res.status(403).send({
-            message: "Forbidden: Invalid Key",
-          });
-        }
+        res.send(result);
+        // } else {
+        //   res.status(403).send({
+        //     message: "Forbidden: Invalid Key",
+        //   });
+        // }
       } catch (error) {
         res.status(500).send({
           message: "An error occurred while fetching data.",
@@ -976,6 +976,7 @@ async function run() {
             ...storeData,
             invoice_no: new_invoice,
             products: filteredProducts,
+            subTotal1: req.body?.subTotal1,
           };
 
           // Insert the modified object into the database
