@@ -47,7 +47,7 @@ cloudinary.config({
 
 async function run() {
   try {
-    const database = client.db("jahanara-enterpeise-3");
+    const database = client.db("premium-shop-system");
     const adminCollection = database.collection("admin");
     const productCollection = database.collection("products");
     const orderCollection = database.collection("orders");
@@ -57,6 +57,7 @@ async function run() {
     const due_Collection = database.collection("due");
     const due_payment_Collection = database.collection("due-payment-history");
     const cost_Collection = database.collection("cost-history");
+    const final_amount_Collection = database.collection("final-amount");
 
     //------------- find admin by login email
     app.get("/users/admin/:email", async (req, res) => {
@@ -380,7 +381,12 @@ async function run() {
           req.headers.authorization?.split(" ")[1];
 
         if (crose_maching_backend_key === crose_maching_frontend_key) {
-          const query = {};
+          const date = req.query.date; // req.query থেকে date নেয়া হচ্ছে
+          const query = { date: date };
+
+          console.log("query", query);
+
+          // ডেটা ডাটাবেজ থেকে ফেচ করা হচ্ছে
           const result = (
             await sells_history_Collection.find(query).toArray()
           ).reverse();
@@ -588,7 +594,7 @@ async function run() {
       }
     });
 
-    // sale_history_this_day for my cash
+    // Summary endpoint with updated subTotal calculation
     app.get("/summary", async (req, res) => {
       try {
         const queryDate = req.query?.date;
@@ -601,20 +607,33 @@ async function run() {
 
         const query = { date: queryDate };
 
+        // Fetch sell history data
         const sell_his_result = await sells_history_Collection
           .find(query)
           .toArray();
 
+        // Fetch due payment data
         const due_payment_res = await due_payment_Collection
           .find(query)
           .toArray();
 
-        console.log(due_payment_res);
-
+        // Fetch cost data
         const cost_list = await cost_Collection.find(query).toArray();
-        // console.log(cost_list);
 
-        // calculate profit from sell
+        // Subtract one day from queryDate to get the previous day's main amount
+        const previousDayDate = new Date(queryDate);
+        previousDayDate.setDate(previousDayDate.getDate() - 1);
+        const previousDayQuery = {
+          date: previousDayDate.toISOString().split("T")[0],
+        };
+
+        // Fetch the previous day's main amount
+        const prevDayResult = await final_amount_Collection.findOne(
+          previousDayQuery
+        );
+        const prevDayMainValue = prevDayResult?.amount || 0; // Default to 0 if no result
+
+        // Calculate total profit from sells
         const totalSellsProfit = sell_his_result.length
           ? sell_his_result.reduce((acc, sell) => {
               const allProductsProfit = sell.products.reduce(
@@ -625,6 +644,7 @@ async function run() {
             }, 0)
           : 0;
 
+        // Calculate overall due and paid from sell history
         const overallDue = sell_his_result.length
           ? sell_his_result.reduce((acc, item) => acc + Number(item.due), 0)
           : 0;
@@ -633,37 +653,71 @@ async function run() {
           ? sell_his_result.reduce((acc, item) => acc + Number(item?.paid), 0)
           : 0;
 
-        const overallSubTotal = sell_his_result.length
-          ? sell_his_result.reduce((acc, item) => acc + item.subTotal, 0)
-          : 0;
-
-        // overall Paid From Due history collection
+        // Calculate the total amount paid from the due payment collection
         const overallPaidFromDue = due_payment_res.length
           ? due_payment_res.reduce((acc, item) => acc + Number(item?.paid), 0)
           : 0;
 
-        // console.log(overallPaidFromDue);
-
-        // cost collection
+        // Calculate total cost from the cost collection
         const allCost = cost_list.length
           ? cost_list.reduce((acc, item) => acc + Number(item?.amount), 0)
           : 0;
 
+        // Calculate the updated subTotal using prevDayMainValue, overallPaid, and overallPaidFromDue
+        const overallSubTotal =
+          prevDayMainValue + overallPaid + overallPaidFromDue;
+
+        // Construct the summary object
         const sell_summary = {
+          prevDayAmount: prevDayMainValue,
           profit: totalSellsProfit,
           due: overallDue,
           paid: overallPaid,
-          subTotal: overallSubTotal,
+          subTotalForSale: overallPaid + overallPaidFromDue,
+          subTotalAmount: overallSubTotal,
           duePayment: overallPaidFromDue,
           totalCost: allCost,
+          amount: overallSubTotal - allCost,
         };
 
-        // Sending results in reverse order for better user experience
+        // Send the summary result
         res.send(sell_summary);
       } catch (error) {
         res.status(500).send({
           message: "An error occurred",
-          error,
+          error: error.message,
+        });
+      }
+    });
+
+    // Endpoint to get the main amount for a specific day
+    app.get("/find-prev-day-main-amount", async (req, res) => {
+      try {
+        const queryDate = req.query?.date;
+
+        // Check if date parameter is provided
+        if (!queryDate) {
+          return res
+            .status(400)
+            .send({ message: "Date query parameter is required" });
+        }
+
+        // MongoDB query to find the main amount by date
+        const query = { date: queryDate };
+
+        // Use `find` and convert the cursor to an array
+        const result = await final_amount_Collection.find(query).toArray();
+
+        // Send the result back to the client
+        res.send(result);
+      } catch (error) {
+        console.error(
+          "An error occurred while fetching the previous day's main amount:",
+          error
+        );
+        res.status(500).send({
+          message: "An error occurred",
+          error: error.message, // Include error message for better understanding
         });
       }
     });
@@ -708,10 +762,14 @@ async function run() {
         if (crose_maching_backend_key == crose_maching_frontend_key) {
           const product = {
             product_name: req.body?.product_name,
+            only_product_name: req.body?.only_product_name,
+            unit: req.body?.unit || "",
             company_name: req.body?.company_name,
             size: req.body?.size,
             purchase_price: req.body?.purchase_price,
+            unit_type: req.body?.unit_type,
           };
+          console.log("product", product);
           const productInfo = await productCollection.insertOne(product);
           res.send(productInfo);
         }
@@ -731,10 +789,16 @@ async function run() {
             product_name: req.body.product_name,
             company_name: req.body.company_name,
             size: req.body.size,
-            quantity: req.body.quantity,
-            purchase_price: req.body.purchase_price,
-            size: req.body.size,
+            quantity: Number(req.body?.quantity),
+            purchase_price: Number(req.body?.purchase_price),
+            unit_type: req.body?.unit_type,
+            discount: Number(req.body?.discount || 0),
+            total: Number(req.body?.total),
           };
+
+          console.log("req.body", req.body);
+
+          console.log("order", order);
 
           // Fetch all orders
           const query = {};
@@ -880,13 +944,14 @@ async function run() {
         if (crose_maching_backend_key === crose_maching_frontend_key) {
           // Extract the storeItem from the request body
           const storeItem = req.body;
+          console.log(storeItem);
 
           // Remove crose_maching_key from storeItem
           const { crose_maching_key, products, ...storeData } = storeItem;
 
           // Filter out products with quantity 0
           const filteredProducts = products.filter(
-            (product) => product.sell_quantity > 0
+            (product) => Number(product.sell_quantity) > 0
           );
 
           // Check if all products have a quantity of 0
@@ -902,6 +967,7 @@ async function run() {
 
           const due_payment_his_length =
             (await due_payment_Collection.find({}).toArray()).length || 0;
+
           // create new invoice
           const new_invoice = sells_his_length + due_payment_his_length + 1;
 
@@ -926,14 +992,13 @@ async function run() {
           for (const soldProduct of final_Sells_Item.products) {
             const matchingStoreProduct = storeAllData.find(
               (storeProduct) =>
-                storeProduct.product_name === soldProduct.productName &&
-                storeProduct.size === soldProduct.size
+                storeProduct.product_name === soldProduct.productName
             );
 
             if (matchingStoreProduct) {
               const newQuantity =
                 matchingStoreProduct.store_quantity -
-                parseInt(soldProduct.sell_quantity);
+                Number(soldProduct?.sell_quantity);
 
               // Ensure newQuantity is not negative
               if (newQuantity < 0) {
@@ -1066,6 +1131,114 @@ async function run() {
 
           const costResult = await cost_Collection.insertOne(cost);
           res.send(costResult);
+        }
+      } catch (error) {
+        console.error("Error handling product add:", error);
+        res.status(500).send("Server Error");
+      }
+    });
+
+    // ------------------    cost post    ---------------------
+    app.post("/purchase-history", async (req, res) => {
+      try {
+        const crose_maching_backend_key = `${process.env.Front_Backend_Key}`;
+        const crose_maching_frontend_key = req.body.crose_maching_key;
+        if (crose_maching_backend_key == crose_maching_frontend_key) {
+          // Extract the storeItem from the request body
+          const purchase_item = req.body;
+
+          // Remove crose_maching_key from storeItem
+          const { crose_maching_key, ...purchaseData } = purchase_item;
+
+          const purchase_his_length =
+            (await purchase_history_Collection.find({}).toArray()).length || 0;
+
+          const currentDate = new Date();
+          const dateOnly = currentDate.toISOString().split("T")[0];
+          const purchase_info = {
+            ...purchaseData,
+            date: dateOnly,
+            sl: purchase_his_length + 1,
+          };
+
+          console.log("purchase Info", purchase_info);
+
+          const Result = await purchase_history_Collection.insertOne(
+            purchase_info
+          );
+          res.send(Result);
+        }
+        if (crose_maching_backend_key === crose_maching_frontend_key) {
+          // pick product name and id
+          const id = req.body?.id;
+          const itemName = req.body?.product_name;
+
+          // Check if the product is already in the store
+          const queryItem = { product_name: itemName };
+
+          const findItem = await storeCollection.findOne(queryItem);
+
+          const currentDate = new Date();
+          const dateOnly = currentDate.toISOString().split("T")[0];
+
+          const purchaseArray = await purchase_history_Collection
+            .find({})
+            .toArray();
+          const si = purchaseArray.length + 1;
+
+          // Update or create new store item
+          if (findItem) {
+            // Update existing store item
+            const total_quantity =
+              findItem?.store_quantity + Number(req.body?.quantity);
+            const updateDoc = {
+              $set: {
+                store_quantity: Number(total_quantity),
+                purchase_price: Number(req.body?.per_unit_price),
+              },
+            };
+
+            const updateResult = await storeCollection.updateOne(
+              queryItem,
+              updateDoc
+            );
+            // return res.send(updateResult); // Return after sending response
+          } else {
+            // Create new store item
+            const storeItem = {
+              product_name: req.body.product_name,
+              company_name: req.body.company_name,
+              store_quantity: Number(req.body.quantity),
+              purchase_price: Number(req.body.per_unit_price),
+              unit_type: req.body.unit_type,
+            };
+
+            const storeInfo = await storeCollection.insertOne(storeItem);
+            // return res.send(storeInfo); // Return after sending response
+          }
+        } else {
+          return res.status(403).send("Unauthorized request."); // Return after unauthorized
+        }
+      } catch (error) {
+        console.error("Error handling product add:", error);
+        res.status(500).send("Server Error");
+      }
+    });
+
+    app.post("/dialy-final-amount", async (req, res) => {
+      try {
+        const crose_maching_backend_key = `${process.env.Front_Backend_Key}`;
+        const crose_maching_frontend_key = req.body.crose_maching_key;
+        if (crose_maching_backend_key == crose_maching_frontend_key) {
+          const currentDate = new Date();
+          const dateOnly = currentDate.toISOString().split("T")[0];
+          const final_amount = {
+            amount: req.body?.amount,
+            date: dateOnly,
+          };
+
+          const Result = await final_amount_Collection.insertOne(final_amount);
+          res.send(Result);
         }
       } catch (error) {
         console.error("Error handling product add:", error);

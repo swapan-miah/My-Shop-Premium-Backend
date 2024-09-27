@@ -1,70 +1,41 @@
-const express = require("express");
-const app = express();
-const port = process.env.PORT || 7000;
-const cors = require("cors");
-require("dotenv").config();
-const bodyParser = require("body-parser");
-const multer = require("multer");
-
-const cloudinary = require("cloudinary").v2;
-
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, "/tmp/");
+{
+  products: [
+    {
+      productName: '³/₄" Albow Rfl',
+      size: '',
+      purchase_price: 17.64,
+      store_quantity: 2,
+      sell_price: '20',
+      sell_quantity: '1',
+      total: 20,
+      profit: 2,
+      unit_type: 'Piece'
+    },
+    {
+      productName: '³/₄" Gi Tee',
+      size: '',
+      purchase_price: 40,
+      store_quantity: 220,
+      sell_price: '45',
+      sell_quantity: '1',
+      total: 45,
+      profit: 5,
+      unit_type: 'Piece'
+    },
+   
+  ],
+  customer: {
+    name: 'Swapan Miah',
+    address: 'Gunatia, Mirzapur, Tangail.',
+    mobile: '01718519989'
   },
-  filename: function (req, file, cb) {
-    cb(null, `${Date.now()}-${file.originalname}`);
-  },
-});
-
-const upload = multer({ storage: storage });
-
-const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
-
-//midleware
-app.use(cors());
-app.use(express.json()); // req.body undefined solve
-
-app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({ extended: false }));
-
-const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.ozyrkam.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
-
-// Create a MongoClient with a MongoClientOptions object to set the Stable API version
-const client = new MongoClient(uri, {
-  serverApi: {
-    version: ServerApiVersion.v1,
-    strict: true,
-    deprecationErrors: true,
-  },
-});
-cloudinary.config({
-  cloud_name: process.env.Cloud_name,
-  api_key: process.env.Api_key,
-  api_secret: process.env.Api_secret,
-});
-
-async function run() {
-  try {
-    const database = client.db("blood");
-    const donarCollection = database.collection("donar");
-
-    //------------- find admin by login email
-    app.get("/users/admin/:email", async (req, res) => {
-      const email = req.params.email;
-      const query = { userEmail: email };
-      const user = await usersCollection.findOne(query);
-      res.send({ isAdmin: user?.role == "admin" });
-    });
-  } finally {
-  }
+  paid: '50',
+  due: 20,
+  subTotal: '0',
+  discount: '5',
+  grand_total: 60,
+  previous_due: '5',
+  total_due: 65,
+  date: '2024-09-26',
+  crose_maching_key: 'dfdlkddfhdDFDFDADFADVDFDSDdfdfgkdfkfkdhfFADFAdjdfadfhDFADFkfaldfjahanara1'
 }
-run().catch(console.dir);
-
-app.get("/", (req, res) => {
-  res.send("Blood Surver is Run");
-});
-
-app.listen(port, () => {
-  console.log(`Blood Surver run on Port:  ${port}`);
-});
