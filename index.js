@@ -47,7 +47,8 @@ cloudinary.config({
 
 async function run() {
   try {
-    const database = client.db("premium-shop-system");
+    const database = client.db("check-m-e-1");
+    // const database = client.db("check-mariam-enter-mirzapur");
     const adminCollection = database.collection("admin");
     const productCollection = database.collection("products");
     const orderCollection = database.collection("orders");
@@ -63,10 +64,8 @@ async function run() {
     app.get("/users/admin/:email", async (req, res) => {
       const email = req.params.email;
       const query = { userEmail: email };
-      console.log(query);
 
       const user = await adminCollection.findOne(query);
-      console.log(user);
 
       res.send({ isAdmin: user?.role == "admin" });
     });
@@ -383,8 +382,6 @@ async function run() {
         // if (crose_maching_backend_key === crose_maching_frontend_key) {
         const date = req.query.date; // req.query থেকে date নেয়া হচ্ছে
         const query = { date: date };
-
-        console.log("query", query);
 
         // ডেটা ডাটাবেজ থেকে ফেচ করা হচ্ছে
         const result = (
@@ -769,7 +766,6 @@ async function run() {
             purchase_price: req.body?.purchase_price,
             unit_type: req.body?.unit_type,
           };
-          console.log("product", product);
           const productInfo = await productCollection.insertOne(product);
           res.send(productInfo);
         }
@@ -795,10 +791,6 @@ async function run() {
             discount: Number(req.body?.discount || 0),
             total: Number(req.body?.total),
           };
-
-          console.log("req.body", req.body);
-
-          console.log("order", order);
 
           // Fetch all orders
           const query = {};
@@ -944,7 +936,6 @@ async function run() {
         if (crose_maching_backend_key === crose_maching_frontend_key) {
           // Extract the storeItem from the request body
           const storeItem = req.body;
-          console.log(storeItem);
 
           // Remove crose_maching_key from storeItem
           const { crose_maching_key, products, ...storeData } = storeItem;
@@ -1054,10 +1045,11 @@ async function run() {
         const crose_maching_frontend_key = req.body.crose_maching_key;
 
         if (crose_maching_backend_key === crose_maching_frontend_key) {
+          console.log("due-payment", req.body);
           const invoice_no = req.body?.invoice_no;
           const query = { invoice_no: invoice_no };
 
-          const due_old_record = await due_Collection.findOne(query);
+          const due_old_record = await due_Collection.findOne(query); //63
 
           const sells_his_length =
             (await sells_history_Collection.find({}).toArray()).length || 0;
@@ -1065,9 +1057,9 @@ async function run() {
           const due_payment_his_length =
             (await due_payment_Collection.find({}).toArray()).length || 0;
           // create new invoice
-          const new_invoice = sells_his_length + due_payment_his_length + 1;
+          const new_invoice = sells_his_length + due_payment_his_length + 1; //64
 
-          const modify_query = { _id: new ObjectId(due_old_record?._id) };
+          const modify_query = { _id: new ObjectId(due_old_record?._id) }; //63
 
           const currentDate = new Date();
           const dateOnly = currentDate.toISOString().split("T")[0];
@@ -1084,6 +1076,17 @@ async function run() {
                 date: dateOnly,
               },
             };
+
+            const check = {
+              invoice_no: new_invoice,
+              customer_name: req.body?.customer_name,
+              customer_address: req.body?.customer_address,
+              customer_mobile: req.body?.customer_mobile,
+              due: req.body?.due,
+              date: dateOnly,
+            };
+
+            console.log("updateDoc", check);
 
             // Update the document in the collection
             const updateResult = await due_Collection.updateOne(
@@ -1161,8 +1164,6 @@ async function run() {
             date: dateOnly,
             sl: purchase_his_length + 1,
           };
-
-          console.log("purchase Info", purchase_info);
 
           const Result = await purchase_history_Collection.insertOne(
             purchase_info
@@ -1407,6 +1408,24 @@ async function run() {
           const id = req.params.id;
           const query = { _id: new ObjectId(id) };
           const result = await orderCollection.deleteOne(query);
+          res.send(result);
+        }
+      } catch (error) {
+        console.error("Error handling delete product:", error);
+        res.status(500).send("Server Error");
+      }
+    });
+
+    // prev-due-delete-after-new-sale because previouse due add new sale
+    app.delete("/prev-due-delete-after-new-sale/:id", async (req, res) => {
+      try {
+        const croseMachingBackendKey = process.env.Front_Backend_Key;
+        const croseMachingFrontendKey = req.body.crose_maching_key;
+
+        if (croseMachingBackendKey === croseMachingFrontendKey) {
+          const id = req.params.id;
+          const query = { _id: new ObjectId(id) };
+          const result = await due_Collection.deleteOne(query);
           res.send(result);
         }
       } catch (error) {
