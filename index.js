@@ -29,7 +29,6 @@ app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: false }));
 
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.ozyrkam.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
-console.log(uri);
 
 // Create a MongoClient with a MongoClientOptions object to set the Stable API version
 const client = new MongoClient(uri, {
@@ -53,6 +52,7 @@ async function run() {
     const productCollection = database.collection("products");
     const orderCollection = database.collection("orders");
     const storeCollection = database.collection("store");
+    const damage_Collection = database.collection("damage");
     const purchase_history_Collection = database.collection("purchase-history");
     const sells_history_Collection = database.collection("sells-history");
     const due_Collection = database.collection("due");
@@ -316,12 +316,10 @@ async function run() {
         if (crose_maching_backend_key === crose_maching_frontend_key) {
           const query = {};
           const data = await storeCollection.find(query).toArray();
-          const filterProducts = data.filter(
-            (product) => product?.store_quantity !== 0
-          );
-          const productsName = filterProducts.map(
-            (product) => product?.product_name
-          );
+          // const filterProducts = data.filter(
+          //   (product) => product?.store_quantity !== 0
+          // );
+          const productsName = data.map((product) => product?.product_name);
           res.send(productsName);
         } else {
           res.status(403).send({
@@ -375,25 +373,32 @@ async function run() {
     // find Store collection
     app.get("/sells-history", async (req, res) => {
       try {
-        // const crose_maching_backend_key = process.env.Front_Backend_Key;
-        // const crose_maching_frontend_key =
-        //   req.headers.authorization?.split(" ")[1];
+        const crose_maching_backend_key = process.env.Front_Backend_Key;
+        const crose_maching_frontend_key =
+          req.headers.authorization?.split(" ")[1];
 
-        // if (crose_maching_backend_key === crose_maching_frontend_key) {
-        const date = req.query.date; // req.query থেকে date নেয়া হচ্ছে
-        const query = { date: date };
+        if (crose_maching_backend_key === crose_maching_frontend_key) {
+          if (req.query?.date === "all") {
+            // "all" হলে সমস্ত ডেটা ফেচ করবে
+            const result = (
+              await sells_history_Collection.find({}).toArray()
+            ).reverse();
+            res.send(result);
+          } else {
+            // নির্দিষ্ট তারিখের ডেটা ফেচ করবে
+            const date = req.query.date;
+            const query = { date: date };
 
-        // ডেটা ডাটাবেজ থেকে ফেচ করা হচ্ছে
-        const result = (
-          await sells_history_Collection.find(query).toArray()
-        ).reverse();
-
-        res.send(result);
-        // } else {
-        //   res.status(403).send({
-        //     message: "Forbidden: Invalid Key",
-        //   });
-        // }
+            const result = (
+              await sells_history_Collection.find(query).toArray()
+            ).reverse();
+            res.send(result);
+          }
+        } else {
+          res.status(403).send({
+            message: "Forbidden: Invalid Key",
+          });
+        }
       } catch (error) {
         res.status(500).send({
           message: "An error occurred while fetching data.",
@@ -751,6 +756,60 @@ async function run() {
       }
     });
 
+    // Find Damage List
+    app.get("/damage-list", async (req, res) => {
+      try {
+        const crose_maching_backend_key = process.env.Front_Backend_Key;
+        const crose_maching_frontend_key =
+          req.headers.authorization?.split(" ")[1];
+
+        // Check if keys match
+        if (crose_maching_backend_key === crose_maching_frontend_key) {
+          const query = {};
+          // Fetch damage list from MongoDB and convert to array
+          const result = await damage_Collection.find(query).toArray();
+
+          res.send(result); // Send the result as the response
+        } else {
+          res.status(403).send({
+            message: "Forbidden: Invalid Key",
+          });
+        }
+      } catch (error) {
+        res.status(500).send({
+          message: "An error occurred while fetching data.",
+          error,
+        });
+      }
+    });
+
+    //  get single product
+    app.get("/this-damage-product-find/:id", async (req, res) => {
+      try {
+        const crose_maching_backend_key = process.env.Front_Backend_Key;
+        const crose_maching_frontend_key =
+          req.headers.authorization?.split(" ")[1];
+
+        if (crose_maching_backend_key === crose_maching_frontend_key) {
+          const id = req.params.id;
+          const query = { _id: new ObjectId(id) };
+          const result = await damage_Collection.findOne(query);
+          console.log("this-damage-product-find", result);
+
+          res.send(result);
+        } else {
+          res.status(403).send({
+            message: "Forbidden: Invalid Key",
+          });
+        }
+      } catch (error) {
+        res.status(500).send({
+          message: "An error occurred while fetching data.",
+          error,
+        });
+      }
+    });
+
     // ------------------    add product    ---------------------
     app.post("/add-product", async (req, res) => {
       try {
@@ -942,7 +1001,9 @@ async function run() {
 
           // Filter out products with quantity 0
           const filteredProducts = products.filter(
-            (product) => Number(product.sell_quantity) > 0
+            (product) =>
+              Number(product.sell_quantity) > 0 ||
+              Number(product.sell_quantity) < 0
           );
 
           // Check if all products have a quantity of 0
@@ -1045,7 +1106,6 @@ async function run() {
         const crose_maching_frontend_key = req.body.crose_maching_key;
 
         if (crose_maching_backend_key === crose_maching_frontend_key) {
-          console.log("due-payment", req.body);
           const invoice_no = req.body?.invoice_no;
           const query = { invoice_no: invoice_no };
 
@@ -1085,8 +1145,6 @@ async function run() {
               due: req.body?.due,
               date: dateOnly,
             };
-
-            console.log("updateDoc", check);
 
             // Update the document in the collection
             const updateResult = await due_Collection.updateOne(
@@ -1248,6 +1306,84 @@ async function run() {
       }
     });
 
+    // ------------------    damage-product-send-damage-listcost post    ---------------------
+
+    app.post("/damage-product-send-damage-list", async (req, res) => {
+      console.log(req.body);
+
+      try {
+        const crose_maching_backend_key = `${process.env.Front_Backend_Key}`;
+        const crose_maching_frontend_key = req.body.crose_maching_key;
+
+        if (crose_maching_backend_key === crose_maching_frontend_key) {
+          const storeProductId = req.body?.storeProductId;
+          const product_name = req.body?.product_name;
+          console.log("storeProductId", storeProductId);
+
+          const storeItemQuery = { _id: new ObjectId(storeProductId) };
+
+          // storeCollection থেকে প্রোডাক্ট খোঁজা
+          const findItem = await storeCollection.findOne(storeItemQuery);
+
+          if (!findItem) {
+            return res.status(404).send("Product not found in store.");
+          }
+
+          const new_store_quantity =
+            req.body?.store_quantity - req.body?.damage_quantity;
+
+          // damage_Collection এ একই product_name এর প্রোডাক্ট খোঁজা
+          const existingDamageItem = await damage_Collection.findOne({
+            product_name: product_name,
+          });
+
+          if (existingDamageItem) {
+            // যদি প্রোডাক্ট থাকে, তাহলে damage_quantity আপডেট করা হবে
+            const updatedDamageQuantity =
+              existingDamageItem.damage_quantity + req.body?.damage_quantity;
+
+            const updateDamageResult = await damage_Collection.updateOne(
+              { product_name: product_name },
+              { $set: { damage_quantity: updatedDamageQuantity } }
+            );
+
+            console.log("Existing damage updated:", updateDamageResult);
+            res.send(updateDamageResult);
+          } else {
+            // যদি প্রোডাক্ট না থাকে, নতুন damage object damage_Collection এ যোগ করা হবে
+            const damage = {
+              product_name: req.body?.product_name,
+              company_name: req.body?.company_name,
+              damage_quantity: req.body?.damage_quantity,
+              unit_type: req.body?.unit_type,
+            };
+
+            const damageResult = await damage_Collection.insertOne(damage);
+
+            console.log("New damage logged:", damageResult);
+            res.send(damageResult);
+          }
+
+          // storeCollection এর store_quantity আপডেট করা
+          const updateResult = await storeCollection.updateOne(
+            { _id: new ObjectId(storeProductId) },
+            { $set: { store_quantity: new_store_quantity } }
+          );
+
+          if (updateResult.modifiedCount === 1) {
+            console.log("Store quantity updated successfully.");
+          } else {
+            res.status(500).send("Failed to update store quantity.");
+          }
+        } else {
+          res.status(403).send("Authorization key mismatch.");
+        }
+      } catch (error) {
+        console.error("Error handling product add:", error);
+        res.status(500).send("Server Error");
+      }
+    });
+
     // update product info
     app.put("/product_info_update/:id", async (req, res) => {
       try {
@@ -1371,6 +1507,77 @@ async function run() {
             options
           );
           res.send(updateResult);
+        } else {
+          res.status(403).send("Unauthorized access");
+        }
+      } catch (error) {
+        console.error("Error handling product info update:", error);
+        res.status(500).send("Server Error");
+      }
+    });
+
+    // damage restore
+    app.put("/damage-update/:id", async (req, res) => {
+      try {
+        const cross_matching_backend_key = `${process.env.Front_Backend_Key}`;
+        const cross_matching_frontend_key = req.body.crose_maching_key;
+
+        if (cross_matching_backend_key === cross_matching_frontend_key) {
+          const paramsId = req.params.id;
+
+          // Fetch the store item by product name from storeCollection
+          const query = { product_name: req.body.product_name };
+          const storeItem = await storeCollection.findOne(query);
+
+          if (!storeItem) {
+            // return res.status(404).send("Store item not found");
+          }
+
+          // Calculate the updated store quantity
+          const updatedStoreQuantity =
+            req.body.return_quantity + storeItem.store_quantity;
+
+          // Update storeCollection with the new store quantity
+          const storeUpdateFilter = { product_name: req.body.product_name };
+          const storeUpdateDoc = {
+            $set: {
+              store_quantity: updatedStoreQuantity,
+            },
+          };
+          const storeUpdate = await storeCollection.updateOne(
+            storeUpdateFilter,
+            storeUpdateDoc
+          );
+
+          res.send(storeUpdate);
+
+          // Calculate updated damage quantity
+          const updateDamageQuantity =
+            req.body?.damage_quantity - req.body?.return_quantity;
+
+          // Check if updateDamageQuantity is 0, delete if true, otherwise update
+          const filter = { _id: new ObjectId(paramsId) };
+
+          if (updateDamageQuantity === 0) {
+            // Delete the damage document if the damage quantity is 0
+            const deleteResult = await damage_Collection.deleteOne(filter);
+            // res.send({
+            //   acknowledged: deleteResult.acknowledged,
+            //   message: "Damage item deleted",
+            // });
+          } else {
+            // Update the damage document with the new damage quantity
+            const updateDoc = {
+              $set: {
+                damage_quantity: updateDamageQuantity,
+              },
+            };
+            const updateResult = await damage_Collection.updateOne(
+              filter,
+              updateDoc
+            );
+            // res.send(updateResult);
+          }
         } else {
           res.status(403).send("Unauthorized access");
         }
