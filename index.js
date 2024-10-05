@@ -1133,6 +1133,74 @@ async function run() {
           }
         }
 
+        // ................... bank others info .............
+        let previousDebt = 0;
+        let currentDebt = 0;
+        let debtPaid_by_timeFrame = 0;
+        let bankCost = 0;
+        let fine = 0;
+        let bonus = 0;
+
+        for (const bank of bank_name_list) {
+          const collectionName = bank.collectionName;
+
+          if (collectionName) {
+            const bank_collection = database.collection(collectionName);
+            const bank_info = await bank_collection.find({}).toArray();
+
+            // This is where the error occurs, remove the second 'let previousDebt' declaration
+            let previousDebtAmount = 0; // Just declare this one for specific scope
+            let willBePaidAmount = 0;
+
+            let currentDebtAmount = 0;
+            let current_willBePaidAmount = 0;
+
+            for (const transaction of bank_info) {
+              const transactionDate = new Date(transaction.date);
+
+              // পূর্বের ঋণ (timeFrame এর আগের দিন পর্যন্ত)
+              if (transactionDate < timeFrameStartDate) {
+                if (transaction.paymentType === "debt_repayment") {
+                  console.log(transaction.amount);
+                  previousDebtAmount += transaction.amount; // debt_repayment amount will be subtracted
+                }
+                if (transaction?.willBePaidAmount) {
+                  willBePaidAmount += transaction.willBePaidAmount;
+                }
+              }
+
+              // বর্তমান ঋণ (timeFrame এর মধ্যে)
+              if (transactionDate <= selectedDate) {
+                if (transaction.paymentType === "debt_repayment") {
+                  console.log(transaction.amount);
+                  currentDebtAmount += transaction.amount; // debt_repayment amount will be subtracted
+                }
+                if (transaction?.willBePaidAmount) {
+                  current_willBePaidAmount += transaction.willBePaidAmount;
+                }
+              }
+              // বর্তমান ঋণ (timeFrame এর মধ্যে)
+              if (
+                transactionDate >= timeFrameStartDate &&
+                transactionDate <= selectedDate
+              ) {
+                if (transaction.paymentType === "debt_repayment") {
+                  debtPaid_by_timeFrame += transaction.amount;
+                } else if (transaction.paymentType === "bankCost") {
+                  bankCost += transaction.amount;
+                } else if (transaction.paymentType === "fine") {
+                  fine += transaction.amount;
+                } else if (transaction.paymentType === "bonus") {
+                  bonus += transaction.amount;
+                }
+              }
+            }
+
+            previousDebt = willBePaidAmount - previousDebtAmount;
+            currentDebt = current_willBePaidAmount - currentDebtAmount;
+          }
+        }
+
         // ------------------- Supplier Information ---------------------
         const supplier_name_list = await supplier_name_Collection
           .find({})
@@ -1248,6 +1316,13 @@ async function run() {
           // supplier_due_before_timeFrame, // সাপ্লায়ার পাওনা (timeFrame এর আগের দিন পর্যন্ত)
           supplier_payment_within_timeFrame, // সাপ্লায়ারকে দিয়েছি (timeFrame এর মধ্যে)
           supplier_due_at_end_of_timeFrame, // সাপ্লায়ার বকেয়া (timeFrame এর শেষে)
+
+          previousDebt, // পূর্বের ঋণ (timeFrame এর আগের দিন পর্যন্ত)
+          currentDebt, // বর্তমান ঋণ (timeFrame এর মধ্যে)
+          debtPaid_by_timeFrame, // (timeFrame এর মধ্যে)
+          bankCost, // (timeFrame এর মধ্যে)
+          fine, // (timeFrame এর মধ্যে)
+          bonus, //(timeFrame এর মধ্যে)
         };
 
         res.send(sell_Info);
