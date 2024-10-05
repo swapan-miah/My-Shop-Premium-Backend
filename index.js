@@ -1018,7 +1018,7 @@ async function run() {
       }
     });
 
-    // / find income-sector
+    //  find income-sector
     app.get("/cash-report", async (req, res) => {
       try {
         const queryDate = req.query?.date;
@@ -1102,6 +1102,10 @@ async function run() {
                 } else if (transaction.paymentType === "bankCost") {
                   bankCost += transaction.amount;
                 }
+                // If it's 'previous_amount' within the timeFrame, add it to totalDeposit
+                else if (transaction.paymentType === "previous_amount") {
+                  deposit += transaction.amount;
+                }
               }
 
               // Previous bank total (before the start of timeFrame)
@@ -1124,7 +1128,7 @@ async function run() {
               previous_amount + deposit + bonus - withdraw - bankCost;
             mainAmount += totalAmount;
             previousBankTotal += previous_amount;
-            totalDeposit += deposit + bonus;
+            totalDeposit += deposit + bonus; // totalDeposit includes 'previous_amount' if it falls within the timeFrame
             totalWithdraw += withdraw;
           }
         }
@@ -1173,7 +1177,7 @@ async function run() {
           allExpense,
           bankTotal: mainAmount, // bank total till the selected timeFrame
           bankPreviousTotal: previousBankTotal, // bank total till the previous day of the timeFrame
-          bankDeposit: totalDeposit, // total deposits during the timeFrame
+          bankDeposit: totalDeposit, // total deposits during the timeFrame (includes 'previous_amount' within timeFrame)
           bankWithdraw: totalWithdraw, // total withdraws during the timeFrame
         };
 
@@ -1185,6 +1189,24 @@ async function run() {
         });
       }
     });
+
+    // Helper function to get the start date of the timeFrame
+    function getStartDateForTimeFrame(selectedDate, timeFrame) {
+      let startDate = new Date(selectedDate);
+
+      if (timeFrame === "daily") {
+        startDate.setHours(0, 0, 0, 0);
+      } else if (timeFrame === "weekly") {
+        const dayOfWeek = startDate.getDay();
+        startDate.setDate(startDate.getDate() - dayOfWeek); // Set to the previous Sunday
+      } else if (timeFrame === "monthly") {
+        startDate.setDate(1); // Set to the first day of the month
+      } else if (timeFrame === "yearly") {
+        startDate.setMonth(0, 1); // Set to the first day of the year
+      }
+
+      return startDate;
+    }
 
     // Helper function to get the start date of the timeFrame
     function getStartDateForTimeFrame(selectedDate, timeFrame) {
