@@ -1,69 +1,59 @@
-app.put("/damage-update/:id", async (req, res) => {
-  try {
-    const cross_matching_backend_key = `${process.env.Front_Backend_Key}`;
-    const cross_matching_frontend_key = req.body.crose_maching_key;
+// Fetch all results without any filter
+const allDuePaidResults = await due_payment_Collection.find({}).toArray();
 
-    if (cross_matching_backend_key === cross_matching_frontend_key) {
-      const paramsId = req.params.id;
+let filteredDuePaymentResults = [];
 
-      // Fetch the store item by product name from storeCollection
-      const query = { product_name: req.body.product_name };
-      const storeItem = await storeCollection.findOne(query);
+// Filter based on timeFrame
+if (timeFrame === "daily") {
+  filteredDuePaymentResults = allDuePaidResults.filter((item) => {
+    return new Date(item.date).toDateString() === selectedDate.toDateString();
+  });
+} else if (timeFrame === "weekly") {
+  const startOfWeek = (date) => {
+    const d = new Date(date);
+    const day = d.getDay();
+    const diff = d.getDate() - day + (day === 0 ? -6 : 1); // adjust when day is sunday
+    return new Date(d.setDate(diff));
+  };
 
-      if (!storeItem) {
-        return res.status(404).send("Store item not found");
-      }
+  const endOfWeek = (date) => {
+    const d = new Date(startOfWeek(date));
+    d.setDate(d.getDate() + 6);
+    return d;
+  };
 
-      // Calculate the updated store quantity
-      const updatedStoreQuantity =
-        req.body.return_quantity + storeItem.store_quantity;
-
-      // Update storeCollection with the new store quantity
-      const storeUpdateFilter = { product_name: req.body.product_name };
-      const storeUpdateDoc = {
-        $set: {
-          store_quantity: updatedStoreQuantity,
-        },
-      };
-      const storeUpdate = await storeCollection.updateOne(
-        storeUpdateFilter,
-        storeUpdateDoc
-      );
-
-      res.send(storeUpdate);
-
-      // Calculate updated damage quantity
-      const updateDamageQuantity =
-        req.body?.damage_quantity - req.body?.return_quantity;
-
-      // Check if updateDamageQuantity is 0, delete if true, otherwise update
-      const filter = { _id: new ObjectId(paramsId) };
-
-      if (updateDamageQuantity === 0) {
-        // Delete the damage document if the damage quantity is 0
-        const deleteResult = await damage_Collection.deleteOne(filter);
-        res.send({
-          acknowledged: deleteResult.acknowledged,
-          message: "Damage item deleted",
-        });
-      } else {
-        // Update the damage document with the new damage quantity
-        const updateDoc = {
-          $set: {
-            damage_quantity: updateDamageQuantity,
-          },
-        };
-        const updateResult = await damage_Collection.updateOne(
-          filter,
-          updateDoc
-        );
-        res.send(updateResult);
-      }
-    } else {
-      res.status(403).send("Unauthorized access");
-    }
-  } catch (error) {
-    console.error("Error handling product info update:", error);
-    res.status(500).send("Server Error");
-  }
-});
+  const weekStart = startOfWeek(selectedDate);
+  const weekEnd = endOfWeek(selectedDate);
+  filteredDuePaymentResults = allDuePaidResults.filter((item) => {
+    const itemDate = new Date(item.date);
+    return itemDate >= weekStart && itemDate <= weekEnd;
+  });
+} else if (timeFrame === "monthly") {
+  const monthStart = new Date(
+    selectedDate.getFullYear(),
+    selectedDate.getMonth(),
+    1
+  );
+  const monthEnd = new Date(
+    selectedDate.getFullYear(),
+    selectedDate.getMonth() + 1,
+    0
+  );
+  filteredDuePaymentResults = allDuePaidResults.filter((item) => {
+    const itemDate = new Date(item.date);
+    return itemDate >= monthStart && itemDate <= monthEnd;
+  });
+} else if (timeFrame === "yearly") {
+  const yearStart = new Date(selectedDate.getFullYear(), 0, 1);
+  const yearEnd = new Date(selectedDate.getFullYear(), 11, 31);
+  filteredDuePaymentResults = allDuePaidResults.filter((item) => {
+    const itemDate = new Date(item.date);
+    return itemDate >= yearStart && itemDate <= yearEnd;
+  });
+} else if (timeFrame === "custom") {
+  filteredDuePaymentResults = allDuePaidResults.filter((item) => {
+    return new Date(item.date).toDateString() === selectedDate.toDateString();
+  });
+} else {
+  return res.status(400).send({ message: "Invalid timeFrame parameter" });
+}

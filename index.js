@@ -59,6 +59,11 @@ async function run() {
     const due_payment_Collection = database.collection("due-payment-history");
     const cost_Collection = database.collection("cost-history");
     const final_amount_Collection = database.collection("final-amount");
+    const basic_expense_Collection = database.collection("basic-expense");
+    const bank_name_Collection = database.collection("bank-collection-name");
+    const supplier_name_Collection = database.collection(
+      "supplier-name-collection"
+    );
 
     //------------- find admin by login email
     app.get("/users/admin/:email", async (req, res) => {
@@ -794,7 +799,6 @@ async function run() {
           const id = req.params.id;
           const query = { _id: new ObjectId(id) };
           const result = await damage_Collection.findOne(query);
-          console.log("this-damage-product-find", result);
 
           res.send(result);
         } else {
@@ -802,6 +806,706 @@ async function run() {
             message: "Forbidden: Invalid Key",
           });
         }
+      } catch (error) {
+        res.status(500).send({
+          message: "An error occurred while fetching data.",
+          error,
+        });
+      }
+    });
+
+    // / find income-sector
+    app.get("/income-sector", async (req, res) => {
+      try {
+        const crose_maching_backend_key = process.env.Front_Backend_Key;
+        const crose_maching_frontend_key =
+          req.headers.authorization?.split(" ")[1];
+
+        if (crose_maching_backend_key === crose_maching_frontend_key) {
+          const queryDate = req.query?.date;
+          const timeFrame = req.query?.timeFrame;
+
+          if (!queryDate || !timeFrame) {
+            return res.status(400).send({
+              message: "Date and timeFrame query parameters are required",
+            });
+          }
+
+          // Fetch all results without any filter
+          const allResults = await income_sector_Collection.find({}).toArray();
+
+          // Parse the query date
+          const selectedDate = new Date(queryDate);
+          let filteredResults = [];
+
+          // Filter based on timeFrame
+          if (timeFrame === "daily") {
+            filteredResults = allResults.filter((item) => {
+              return (
+                new Date(item.date).toDateString() ===
+                selectedDate.toDateString()
+              );
+            });
+          } else if (timeFrame === "weekly") {
+            const startOfWeek = (date) => {
+              const d = new Date(date);
+              const day = d.getDay();
+              const diff = d.getDate() - day + (day === 0 ? -6 : 1); // adjust when day is sunday
+              return new Date(d.setDate(diff));
+            };
+
+            const endOfWeek = (date) => {
+              const d = new Date(startOfWeek(date));
+              d.setDate(d.getDate() + 6);
+              return d;
+            };
+
+            const weekStart = startOfWeek(selectedDate);
+            const weekEnd = endOfWeek(selectedDate);
+            filteredResults = allResults.filter((item) => {
+              const itemDate = new Date(item.date);
+              return itemDate >= weekStart && itemDate <= weekEnd;
+            });
+          } else if (timeFrame === "monthly") {
+            const monthStart = new Date(
+              selectedDate.getFullYear(),
+              selectedDate.getMonth(),
+              1
+            );
+            const monthEnd = new Date(
+              selectedDate.getFullYear(),
+              selectedDate.getMonth() + 1,
+              0
+            );
+            filteredResults = allResults.filter((item) => {
+              const itemDate = new Date(item.date);
+              return itemDate >= monthStart && itemDate <= monthEnd;
+            });
+          } else if (timeFrame === "yearly") {
+            const yearStart = new Date(selectedDate.getFullYear(), 0, 1);
+            const yearEnd = new Date(selectedDate.getFullYear(), 11, 31);
+            filteredResults = allResults.filter((item) => {
+              const itemDate = new Date(item.date);
+              return itemDate >= yearStart && itemDate <= yearEnd;
+            });
+          } else if (timeFrame === "custom") {
+            filteredResults = allResults.filter((item) => {
+              return (
+                new Date(item.date).toDateString() ===
+                selectedDate.toDateString()
+              );
+            });
+          } else {
+            return res
+              .status(400)
+              .send({ message: "Invalid timeFrame parameter" });
+          }
+
+          // Send the filtered result to the frontend
+          res.send(filteredResults);
+        } else {
+          res.status(403).send({
+            message: "Forbidden: Invalid Key",
+          });
+        }
+      } catch (error) {
+        res.status(500).send({
+          message: "An error occurred while fetching data.",
+          error,
+        });
+      }
+    });
+
+    // find Expenditure_Sector
+    app.get("/expenditure-sector", async (req, res) => {
+      try {
+        const crose_maching_backend_key = process.env.Front_Backend_Key;
+        const crose_maching_frontend_key =
+          req.headers.authorization?.split(" ")[1];
+
+        if (crose_maching_backend_key === crose_maching_frontend_key) {
+          const queryDate = req.query?.date;
+          const timeFrame = req.query?.timeFrame;
+
+          if (!queryDate || !timeFrame) {
+            return res.status(400).send({
+              message: "Date and timeFrame query parameters are required",
+            });
+          }
+
+          // Fetch all results without any filter
+          const allResults = await expen_sector_Collection.find({}).toArray();
+
+          // Parse the query date
+          const selectedDate = new Date(queryDate);
+          let filteredResults = [];
+
+          // Filter based on timeFrame
+          if (timeFrame === "daily") {
+            filteredResults = allResults.filter((item) => {
+              return (
+                new Date(item.date).toDateString() ===
+                selectedDate.toDateString()
+              );
+            });
+          } else if (timeFrame === "weekly") {
+            const startOfWeek = (date) => {
+              const d = new Date(date);
+              const day = d.getDay();
+              const diff = d.getDate() - day + (day === 0 ? -6 : 1); // adjust when day is sunday
+              return new Date(d.setDate(diff));
+            };
+
+            const endOfWeek = (date) => {
+              const d = new Date(startOfWeek(date));
+              d.setDate(d.getDate() + 6);
+              return d;
+            };
+
+            const weekStart = startOfWeek(selectedDate);
+            const weekEnd = endOfWeek(selectedDate);
+            filteredResults = allResults.filter((item) => {
+              const itemDate = new Date(item.date);
+              return itemDate >= weekStart && itemDate <= weekEnd;
+            });
+          } else if (timeFrame === "monthly") {
+            const monthStart = new Date(
+              selectedDate.getFullYear(),
+              selectedDate.getMonth(),
+              1
+            );
+            const monthEnd = new Date(
+              selectedDate.getFullYear(),
+              selectedDate.getMonth() + 1,
+              0
+            );
+            filteredResults = allResults.filter((item) => {
+              const itemDate = new Date(item.date);
+              return itemDate >= monthStart && itemDate <= monthEnd;
+            });
+          } else if (timeFrame === "yearly") {
+            const yearStart = new Date(selectedDate.getFullYear(), 0, 1);
+            const yearEnd = new Date(selectedDate.getFullYear(), 11, 31);
+            filteredResults = allResults.filter((item) => {
+              const itemDate = new Date(item.date);
+              return itemDate >= yearStart && itemDate <= yearEnd;
+            });
+          } else if (timeFrame === "custom") {
+            filteredResults = allResults.filter((item) => {
+              return (
+                new Date(item.date).toDateString() ===
+                selectedDate.toDateString()
+              );
+            });
+          } else {
+            return res
+              .status(400)
+              .send({ message: "Invalid timeFrame parameter" });
+          }
+
+          // Send the filtered result to the frontend
+          res.send(filteredResults);
+        } else {
+          res.status(403).send({
+            message: "Forbidden: Invalid Key",
+          });
+        }
+      } catch (error) {
+        res.status(500).send({
+          message: "An error occurred while fetching data.",
+          error,
+        });
+      }
+    });
+
+    // / find income-sector
+    app.get("/cash-report", async (req, res) => {
+      try {
+        const crose_maching_backend_key = process.env.Front_Backend_Key;
+        const crose_maching_frontend_key =
+          req.headers.authorization?.split(" ")[1];
+
+        if (crose_maching_backend_key === crose_maching_frontend_key) {
+          const queryDate = req.query?.date;
+          const timeFrame = req.query?.timeFrame;
+
+          if (!queryDate || !timeFrame) {
+            return res.status(400).send({
+              message: "Date and timeFrame query parameters are required",
+            });
+          }
+
+          // Fetch all results without any filter
+          const allResults = await sells_history_Collection.find({}).toArray();
+
+          // Parse the query date
+          const selectedDate = new Date(queryDate);
+          let filteredResults = [];
+
+          // Filter based on timeFrame
+          if (timeFrame === "daily") {
+            filteredResults = allResults.filter((item) => {
+              return (
+                new Date(item.date).toDateString() ===
+                selectedDate.toDateString()
+              );
+            });
+          } else if (timeFrame === "weekly") {
+            const startOfWeek = (date) => {
+              const d = new Date(date);
+              const day = d.getDay();
+              const diff = d.getDate() - day + (day === 0 ? -6 : 1); // adjust when day is sunday
+              return new Date(d.setDate(diff));
+            };
+
+            const endOfWeek = (date) => {
+              const d = new Date(startOfWeek(date));
+              d.setDate(d.getDate() + 6);
+              return d;
+            };
+
+            const weekStart = startOfWeek(selectedDate);
+            const weekEnd = endOfWeek(selectedDate);
+            filteredResults = allResults.filter((item) => {
+              const itemDate = new Date(item.date);
+              return itemDate >= weekStart && itemDate <= weekEnd;
+            });
+          } else if (timeFrame === "monthly") {
+            const monthStart = new Date(
+              selectedDate.getFullYear(),
+              selectedDate.getMonth(),
+              1
+            );
+            const monthEnd = new Date(
+              selectedDate.getFullYear(),
+              selectedDate.getMonth() + 1,
+              0
+            );
+            filteredResults = allResults.filter((item) => {
+              const itemDate = new Date(item.date);
+              return itemDate >= monthStart && itemDate <= monthEnd;
+            });
+          } else if (timeFrame === "yearly") {
+            const yearStart = new Date(selectedDate.getFullYear(), 0, 1);
+            const yearEnd = new Date(selectedDate.getFullYear(), 11, 31);
+            filteredResults = allResults.filter((item) => {
+              const itemDate = new Date(item.date);
+              return itemDate >= yearStart && itemDate <= yearEnd;
+            });
+          } else if (timeFrame === "custom") {
+            filteredResults = allResults.filter((item) => {
+              return (
+                new Date(item.date).toDateString() ===
+                selectedDate.toDateString()
+              );
+            });
+          } else {
+            return res
+              .status(400)
+              .send({ message: "Invalid timeFrame parameter" });
+          }
+
+          // -----------------------------------------------------------------------
+
+          // Fetch all results without any filter
+          const allDuePaidResults = await due_payment_Collection
+            .find({})
+            .toArray();
+
+          let filteredDuePaymentResults = [];
+
+          // Filter based on timeFrame
+          if (timeFrame === "daily") {
+            filteredDuePaymentResults = allDuePaidResults.filter((item) => {
+              return (
+                new Date(item.date).toDateString() ===
+                selectedDate.toDateString()
+              );
+            });
+          } else if (timeFrame === "weekly") {
+            const startOfWeek = (date) => {
+              const d = new Date(date);
+              const day = d.getDay();
+              const diff = d.getDate() - day + (day === 0 ? -6 : 1); // adjust when day is sunday
+              return new Date(d.setDate(diff));
+            };
+
+            const endOfWeek = (date) => {
+              const d = new Date(startOfWeek(date));
+              d.setDate(d.getDate() + 6);
+              return d;
+            };
+
+            const weekStart = startOfWeek(selectedDate);
+            const weekEnd = endOfWeek(selectedDate);
+            filteredDuePaymentResults = allDuePaidResults.filter((item) => {
+              const itemDate = new Date(item.date);
+              return itemDate >= weekStart && itemDate <= weekEnd;
+            });
+          } else if (timeFrame === "monthly") {
+            const monthStart = new Date(
+              selectedDate.getFullYear(),
+              selectedDate.getMonth(),
+              1
+            );
+            const monthEnd = new Date(
+              selectedDate.getFullYear(),
+              selectedDate.getMonth() + 1,
+              0
+            );
+            filteredDuePaymentResults = allDuePaidResults.filter((item) => {
+              const itemDate = new Date(item.date);
+              return itemDate >= monthStart && itemDate <= monthEnd;
+            });
+          } else if (timeFrame === "yearly") {
+            const yearStart = new Date(selectedDate.getFullYear(), 0, 1);
+            const yearEnd = new Date(selectedDate.getFullYear(), 11, 31);
+            filteredDuePaymentResults = allDuePaidResults.filter((item) => {
+              const itemDate = new Date(item.date);
+              return itemDate >= yearStart && itemDate <= yearEnd;
+            });
+          } else if (timeFrame === "custom") {
+            filteredDuePaymentResults = allDuePaidResults.filter((item) => {
+              return (
+                new Date(item.date).toDateString() ===
+                selectedDate.toDateString()
+              );
+            });
+          } else {
+            return res
+              .status(400)
+              .send({ message: "Invalid timeFrame parameter" });
+          }
+          // ------------------------------------------
+          // ---------------Expense start---------------------------
+
+          // Fetch all results without any filter
+          const allExpenseResults = await basic_expense_Collection
+            .find({})
+            .toArray();
+
+          let filteredExpenseResults = [];
+
+          // Filter based on timeFrame
+          if (timeFrame === "daily") {
+            filteredExpenseResults = allExpenseResults.filter((item) => {
+              return (
+                new Date(item.date).toDateString() ===
+                selectedDate.toDateString()
+              );
+            });
+          } else if (timeFrame === "weekly") {
+            const startOfWeek = (date) => {
+              const d = new Date(date);
+              const day = d.getDay();
+              const diff = d.getDate() - day + (day === 0 ? -6 : 1); // adjust when day is sunday
+              return new Date(d.setDate(diff));
+            };
+
+            const endOfWeek = (date) => {
+              const d = new Date(startOfWeek(date));
+              d.setDate(d.getDate() + 6);
+              return d;
+            };
+
+            const weekStart = startOfWeek(selectedDate);
+            const weekEnd = endOfWeek(selectedDate);
+            filteredExpenseResults = allExpenseResults.filter((item) => {
+              const itemDate = new Date(item.date);
+              return itemDate >= weekStart && itemDate <= weekEnd;
+            });
+          } else if (timeFrame === "monthly") {
+            const monthStart = new Date(
+              selectedDate.getFullYear(),
+              selectedDate.getMonth(),
+              1
+            );
+            const monthEnd = new Date(
+              selectedDate.getFullYear(),
+              selectedDate.getMonth() + 1,
+              0
+            );
+            filteredExpenseResults = allExpenseResults.filter((item) => {
+              const itemDate = new Date(item.date);
+              return itemDate >= monthStart && itemDate <= monthEnd;
+            });
+          } else if (timeFrame === "yearly") {
+            const yearStart = new Date(selectedDate.getFullYear(), 0, 1);
+            const yearEnd = new Date(selectedDate.getFullYear(), 11, 31);
+            filteredExpenseResults = allExpenseResults.filter((item) => {
+              const itemDate = new Date(item.date);
+              return itemDate >= yearStart && itemDate <= yearEnd;
+            });
+          } else if (timeFrame === "custom") {
+            filteredExpenseResults = allExpenseResults.filter((item) => {
+              return (
+                new Date(item.date).toDateString() ===
+                selectedDate.toDateString()
+              );
+            });
+          } else {
+            return res
+              .status(400)
+              .send({ message: "Invalid timeFrame parameter" });
+          }
+
+          //------------------------- Expense End-------------------------------------------
+
+          // ----------------------Bank start -------------------------------------------------
+          // ----------------------Bank  end -------------------------------------------------
+
+          const grandTotal = filteredResults?.reduce((acc, item) => {
+            return acc + Number(item?.grand_total || 0);
+          }, 0);
+
+          const profit = filteredResults?.reduce((acc, item) => {
+            return acc + Number(item?.total_profit || 0);
+          }, 0);
+
+          const previouse_due = filteredResults?.reduce((acc, item) => {
+            return acc + Number(item?.previous_due || 0);
+          }, 0);
+
+          const total_due = filteredResults?.reduce((acc, item) => {
+            return acc + Number(item?.total_due || 0);
+          }, 0);
+
+          const paid = filteredResults?.reduce((acc, item) => {
+            return acc + Number(item?.paid || 0);
+          }, 0);
+
+          const due = filteredResults?.reduce((acc, item) => {
+            return acc + Number(item?.due || 0);
+          }, 0);
+
+          const allDuepaid = filteredDuePaymentResults?.reduce((acc, item) => {
+            return acc + Number(item?.paid || 0);
+          }, 0);
+
+          const allExpense = filteredExpenseResults?.reduce((acc, item) => {
+            return acc + Number(item?.amount || 0);
+          }, 0);
+
+          const sell_Info = {
+            grandTotal: grandTotal,
+            profit: profit,
+            previouse_due: previouse_due + allDuepaid,
+            total_due: total_due,
+            paid: paid + allDuepaid,
+            due,
+            allExpense,
+          };
+
+          // Send the filtered result to the frontend
+          res.send(sell_Info);
+        } else {
+          res.status(403).send({
+            message: "Forbidden: Invalid Key",
+          });
+        }
+      } catch (error) {
+        res.status(500).send({
+          message: "An error occurred while fetching data.",
+          error,
+        });
+      }
+    });
+
+    //  find-expense
+    app.get("/find-expense", async (req, res) => {
+      try {
+        const crose_maching_backend_key = process.env.Front_Backend_Key;
+        const crose_maching_frontend_key =
+          req.headers.authorization?.split(" ")[1];
+
+        if (crose_maching_backend_key === crose_maching_frontend_key) {
+          const queryDate = req.query?.date;
+          const timeFrame = req.query?.timeFrame;
+
+          if (!queryDate || !timeFrame) {
+            return res.status(400).send({
+              message: "Date and timeFrame query parameters are required",
+            });
+          }
+
+          // Fetch all results without any filter
+          const allResults = await basic_expense_Collection.find({}).toArray();
+
+          // Parse the query date
+          const selectedDate = new Date(queryDate);
+          let filteredResults = [];
+
+          // Filter based on timeFrame
+          if (timeFrame === "daily") {
+            filteredResults = allResults.filter((item) => {
+              return (
+                new Date(item.date).toDateString() ===
+                selectedDate.toDateString()
+              );
+            });
+          } else if (timeFrame === "weekly") {
+            const startOfWeek = (date) => {
+              const d = new Date(date);
+              const day = d.getDay();
+              const diff = d.getDate() - day + (day === 0 ? -6 : 1); // adjust when day is sunday
+              return new Date(d.setDate(diff));
+            };
+
+            const endOfWeek = (date) => {
+              const d = new Date(startOfWeek(date));
+              d.setDate(d.getDate() + 6);
+              return d;
+            };
+
+            const weekStart = startOfWeek(selectedDate);
+            const weekEnd = endOfWeek(selectedDate);
+            filteredResults = allResults.filter((item) => {
+              const itemDate = new Date(item.date);
+              return itemDate >= weekStart && itemDate <= weekEnd;
+            });
+          } else if (timeFrame === "monthly") {
+            const monthStart = new Date(
+              selectedDate.getFullYear(),
+              selectedDate.getMonth(),
+              1
+            );
+            const monthEnd = new Date(
+              selectedDate.getFullYear(),
+              selectedDate.getMonth() + 1,
+              0
+            );
+            filteredResults = allResults.filter((item) => {
+              const itemDate = new Date(item.date);
+              return itemDate >= monthStart && itemDate <= monthEnd;
+            });
+          } else if (timeFrame === "yearly") {
+            const yearStart = new Date(selectedDate.getFullYear(), 0, 1);
+            const yearEnd = new Date(selectedDate.getFullYear(), 11, 31);
+            filteredResults = allResults.filter((item) => {
+              const itemDate = new Date(item.date);
+              return itemDate >= yearStart && itemDate <= yearEnd;
+            });
+          } else if (timeFrame === "custom") {
+            filteredResults = allResults.filter((item) => {
+              return (
+                new Date(item.date).toDateString() ===
+                selectedDate.toDateString()
+              );
+            });
+          } else {
+            return res
+              .status(400)
+              .send({ message: "Invalid timeFrame parameter" });
+          }
+
+          res.send(filteredResults);
+        } else {
+          res.status(403).send({
+            message: "Forbidden: Invalid Key",
+          });
+        }
+      } catch (error) {
+        res.status(500).send({
+          message: "An error occurred while fetching data.",
+          error,
+        });
+      }
+    });
+
+    // find all bank name
+    app.get("/all-bank-info", async (req, res) => {
+      try {
+        // const crose_maching_backend_key = process.env.Front_Backend_Key;
+        // const crose_maching_frontend_key =
+        //   req.headers.authorization?.split(" ")[1];
+
+        // if (crose_maching_backend_key === crose_maching_frontend_key) {
+        // Step 1: Retrieve all the bank names (collections)
+        const bank_name_list = await bank_name_Collection.find({}).toArray();
+
+        // Step 2: Iterate over each collectionName and query the respective collection
+        const bank_info_list = [];
+
+        for (const bank of bank_name_list) {
+          const collectionName = bank.collectionName; // Access collectionName from each bank document
+
+          if (collectionName) {
+            // Step 3: Dynamically query each collection
+            const bank_collection = database.collection(collectionName); // Dynamically access the collection
+            const bank_info = await bank_collection.find({}).toArray(); // Query all documents from the collection
+
+            bank_info_list.push({
+              collectionName: collectionName, // Include the collection name
+              data: bank_info, // Include the fetched data
+            });
+          }
+        }
+
+        // Step 4: Send the result back to the client
+        res.send(bank_info_list);
+        // } else {
+        //   res.status(403).send({
+        //     message: "Forbidden: Invalid Key",
+        //   });
+        // }
+      } catch (error) {
+        res.status(500).send({
+          message: "An error occurred while fetching data.",
+          error,
+        });
+      }
+    });
+
+    // find all-supplier-info
+    app.get("/all-supplier-info", async (req, res) => {
+      console.log("I am from all supplier");
+
+      try {
+        // const crose_maching_backend_key = process.env.Front_Backend_Key;
+        // const crose_maching_frontend_key =
+        //   req.headers.authorization?.split(" ")[1];
+
+        // if (crose_maching_backend_key === crose_maching_frontend_key) {
+        // Step 1: Retrieve all the bank names (collections)
+        const supplier_name_list = await supplier_name_Collection
+          .find({})
+          .toArray();
+
+        // Step 2: Iterate over each collectionName and query the respective collection
+        const supplier_info_list = [];
+
+        for (const supplier of supplier_name_list) {
+          const collectionName = supplier.collectionName; // Access collectionName from each bank document
+
+          if (collectionName) {
+            // Step 3: Dynamically query each collection
+            const supplier_collection = database.collection(collectionName); // Dynamically access the collection
+            const supplier_info = await supplier_collection.find({}).toArray(); // Query all documents from the collection
+
+            supplier_info_list.push({
+              collectionName: collectionName, // Include the collection name
+              data: supplier_info, // Include the fetched data
+            });
+          }
+        }
+
+        // Step 4: Send the result back to the client
+        res.send(supplier_info_list);
+        // } else {
+        //   res.status(403).send({
+        //     message: "Forbidden: Invalid Key",
+        //   });
+        // }
+      } catch (error) {
+        res.status(500).send({
+          message: "An error occurred while fetching data.",
+          error,
+        });
+      }
+    });
+
+    app.get("/all-bank-info-for-check", async (req, res) => {
+      try {
       } catch (error) {
         res.status(500).send({
           message: "An error occurred while fetching data.",
@@ -1309,8 +2013,6 @@ async function run() {
     // ------------------    damage-product-send-damage-listcost post    ---------------------
 
     app.post("/damage-product-send-damage-list", async (req, res) => {
-      console.log(req.body);
-
       try {
         const crose_maching_backend_key = `${process.env.Front_Backend_Key}`;
         const crose_maching_frontend_key = req.body.crose_maching_key;
@@ -1318,7 +2020,6 @@ async function run() {
         if (crose_maching_backend_key === crose_maching_frontend_key) {
           const storeProductId = req.body?.storeProductId;
           const product_name = req.body?.product_name;
-          console.log("storeProductId", storeProductId);
 
           const storeItemQuery = { _id: new ObjectId(storeProductId) };
 
@@ -1347,7 +2048,6 @@ async function run() {
               { $set: { damage_quantity: updatedDamageQuantity } }
             );
 
-            console.log("Existing damage updated:", updateDamageResult);
             res.send(updateDamageResult);
           } else {
             // যদি প্রোডাক্ট না থাকে, নতুন damage object damage_Collection এ যোগ করা হবে
@@ -1360,7 +2060,6 @@ async function run() {
 
             const damageResult = await damage_Collection.insertOne(damage);
 
-            console.log("New damage logged:", damageResult);
             res.send(damageResult);
           }
 
@@ -1371,12 +2070,153 @@ async function run() {
           );
 
           if (updateResult.modifiedCount === 1) {
-            console.log("Store quantity updated successfully.");
+            // console.log("Store quantity updated successfully.");
           } else {
             res.status(500).send("Failed to update store quantity.");
           }
         } else {
           res.status(403).send("Authorization key mismatch.");
+        }
+      } catch (error) {
+        console.error("Error handling product add:", error);
+        res.status(500).send("Server Error");
+      }
+    });
+
+    // \create banck collection
+
+    app.post("/create-collection-for-bank", async (req, res) => {
+      try {
+        const crose_maching_backend_key = `${process.env.Front_Backend_Key}`;
+        const crose_maching_frontend_key = req.body.crose_maching_key;
+
+        if (crose_maching_backend_key === crose_maching_frontend_key) {
+          const collectionName = `${req.body.name}_${req.body.type}`;
+          const { crose_maching_key, ...bankData } = req.body;
+
+          const newCollection = await database
+            .collection(collectionName)
+            .insertOne(bankData);
+          const collectionListUpdate = await bank_name_Collection.insertOne({
+            collectionName,
+          });
+
+          res.status(201).json({
+            message: "Collection and bank info created successfully",
+            insertedId: newCollection.insertedId,
+          });
+        } else {
+          res.status(403).json({ message: "Forbidden: Invalid Key" });
+        }
+      } catch (error) {
+        console.error("Error creating collection:", error);
+        res.status(500).json({ message: "Server Error", error });
+      }
+    });
+
+    // \create supplier collection
+    app.post("/create-collection-for-supplier", async (req, res) => {
+      try {
+        const crose_maching_backend_key = `${process.env.Front_Backend_Key}`;
+        const crose_maching_frontend_key = req.body.crose_maching_key;
+
+        if (crose_maching_backend_key === crose_maching_frontend_key) {
+          const collectionName = `${req.body.name}_${req.body.type}`;
+          const { crose_maching_key, ...supplierData } = req.body;
+
+          const newCollection = await database
+            .collection(collectionName)
+            .insertOne(supplierData);
+          const collectionListUpdate = await supplier_name_Collection.insertOne(
+            {
+              collectionName,
+            }
+          );
+
+          res.status(201).json({
+            message: "Collection and bank info created successfully",
+            insertedId: newCollection.insertedId,
+          });
+        } else {
+          res.status(403).json({ message: "Forbidden: Invalid Key" });
+        }
+      } catch (error) {
+        console.error("Error creating collection:", error);
+        res.status(500).json({ message: "Server Error", error });
+      }
+    });
+
+    // basic expense
+    app.post("/basic-expense", async (req, res) => {
+      try {
+        const crose_maching_backend_key = `${process.env.Front_Backend_Key}`;
+        const crose_maching_frontend_key = req.body.crose_maching_key;
+        if (crose_maching_backend_key == crose_maching_frontend_key) {
+          const expensInfo = req.body;
+          const { crose_maching_key, ...storeData } = expensInfo;
+
+          const expensInfoObj = {
+            ...storeData,
+          };
+          const expenseInfo = await basic_expense_Collection.insertOne(
+            expensInfoObj
+          );
+          res.send(expenseInfo);
+        }
+      } catch (error) {
+        console.error("Error handling product add:", error);
+        res.status(500).send("Server Error");
+      }
+    });
+
+    // ------------------    bank-transaction    ---------------------
+    app.post("/bank-transaction", async (req, res) => {
+      try {
+        const crose_maching_backend_key = `${process.env.Front_Backend_Key}`;
+        const crose_maching_frontend_key = req.body.crose_maching_key;
+        if (crose_maching_backend_key == crose_maching_frontend_key) {
+          const collectionName = req.body?.name;
+          console.log(collectionName);
+
+          const { crose_maching_key, ...data } = req.body;
+          const info = {
+            ...data,
+          };
+
+          const Result = await database
+            .collection(collectionName)
+            .insertOne(info);
+
+          console.log(Result);
+
+          res.send(Result);
+        }
+      } catch (error) {
+        console.error("Error handling product add:", error);
+        res.status(500).send("Server Error");
+      }
+    });
+    // ------------------    supplier-transaction    ---------------------
+    app.post("/supplier-transaction", async (req, res) => {
+      try {
+        const crose_maching_backend_key = `${process.env.Front_Backend_Key}`;
+        const crose_maching_frontend_key = req.body.crose_maching_key;
+        if (crose_maching_backend_key == crose_maching_frontend_key) {
+          const collectionName = req.body?.name;
+          console.log(collectionName);
+
+          const { crose_maching_key, ...data } = req.body;
+          const info = {
+            ...data,
+          };
+
+          const Result = await database
+            .collection(collectionName)
+            .insertOne(info);
+
+          console.log(Result);
+
+          res.send(Result);
         }
       } catch (error) {
         console.error("Error handling product add:", error);
