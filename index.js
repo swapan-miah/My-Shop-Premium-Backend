@@ -1021,288 +1021,143 @@ async function run() {
     // / find income-sector
     app.get("/cash-report", async (req, res) => {
       try {
-        const crose_maching_backend_key = process.env.Front_Backend_Key;
-        const crose_maching_frontend_key =
-          req.headers.authorization?.split(" ")[1];
+        // const crose_maching_backend_key = process.env.Front_Backend_Key;
+        // const crose_maching_frontend_key =
+        //   req.headers.authorization?.split(" ")[1];
 
-        if (crose_maching_backend_key === crose_maching_frontend_key) {
-          const queryDate = req.query?.date;
-          const timeFrame = req.query?.timeFrame;
+        // if (crose_maching_backend_key === crose_maching_frontend_key) {
+        const queryDate = req.query?.date;
+        const timeFrame = req.query?.timeFrame;
 
-          if (!queryDate || !timeFrame) {
-            return res.status(400).send({
-              message: "Date and timeFrame query parameters are required",
-            });
-          }
-
-          // Fetch all results without any filter
-          const allResults = await sells_history_Collection.find({}).toArray();
-
-          // Parse the query date
-          const selectedDate = new Date(queryDate);
-          let filteredResults = [];
-
-          // Filter based on timeFrame
-          if (timeFrame === "daily") {
-            filteredResults = allResults.filter((item) => {
-              return (
-                new Date(item.date).toDateString() ===
-                selectedDate.toDateString()
-              );
-            });
-          } else if (timeFrame === "weekly") {
-            const startOfWeek = (date) => {
-              const d = new Date(date);
-              const day = d.getDay();
-              const diff = d.getDate() - day + (day === 0 ? -6 : 1); // adjust when day is sunday
-              return new Date(d.setDate(diff));
-            };
-
-            const endOfWeek = (date) => {
-              const d = new Date(startOfWeek(date));
-              d.setDate(d.getDate() + 6);
-              return d;
-            };
-
-            const weekStart = startOfWeek(selectedDate);
-            const weekEnd = endOfWeek(selectedDate);
-            filteredResults = allResults.filter((item) => {
-              const itemDate = new Date(item.date);
-              return itemDate >= weekStart && itemDate <= weekEnd;
-            });
-          } else if (timeFrame === "monthly") {
-            const monthStart = new Date(
-              selectedDate.getFullYear(),
-              selectedDate.getMonth(),
-              1
-            );
-            const monthEnd = new Date(
-              selectedDate.getFullYear(),
-              selectedDate.getMonth() + 1,
-              0
-            );
-            filteredResults = allResults.filter((item) => {
-              const itemDate = new Date(item.date);
-              return itemDate >= monthStart && itemDate <= monthEnd;
-            });
-          } else if (timeFrame === "yearly") {
-            const yearStart = new Date(selectedDate.getFullYear(), 0, 1);
-            const yearEnd = new Date(selectedDate.getFullYear(), 11, 31);
-            filteredResults = allResults.filter((item) => {
-              const itemDate = new Date(item.date);
-              return itemDate >= yearStart && itemDate <= yearEnd;
-            });
-          } else if (timeFrame === "custom") {
-            filteredResults = allResults.filter((item) => {
-              return (
-                new Date(item.date).toDateString() ===
-                selectedDate.toDateString()
-              );
-            });
-          } else {
-            return res
-              .status(400)
-              .send({ message: "Invalid timeFrame parameter" });
-          }
-
-          // -----------------------------------------------------------------------
-
-          // Fetch all results without any filter
-          const allDuePaidResults = await due_payment_Collection
-            .find({})
-            .toArray();
-
-          let filteredDuePaymentResults = [];
-
-          // Filter based on timeFrame
-          if (timeFrame === "daily") {
-            filteredDuePaymentResults = allDuePaidResults.filter((item) => {
-              return (
-                new Date(item.date).toDateString() ===
-                selectedDate.toDateString()
-              );
-            });
-          } else if (timeFrame === "weekly") {
-            const startOfWeek = (date) => {
-              const d = new Date(date);
-              const day = d.getDay();
-              const diff = d.getDate() - day + (day === 0 ? -6 : 1); // adjust when day is sunday
-              return new Date(d.setDate(diff));
-            };
-
-            const endOfWeek = (date) => {
-              const d = new Date(startOfWeek(date));
-              d.setDate(d.getDate() + 6);
-              return d;
-            };
-
-            const weekStart = startOfWeek(selectedDate);
-            const weekEnd = endOfWeek(selectedDate);
-            filteredDuePaymentResults = allDuePaidResults.filter((item) => {
-              const itemDate = new Date(item.date);
-              return itemDate >= weekStart && itemDate <= weekEnd;
-            });
-          } else if (timeFrame === "monthly") {
-            const monthStart = new Date(
-              selectedDate.getFullYear(),
-              selectedDate.getMonth(),
-              1
-            );
-            const monthEnd = new Date(
-              selectedDate.getFullYear(),
-              selectedDate.getMonth() + 1,
-              0
-            );
-            filteredDuePaymentResults = allDuePaidResults.filter((item) => {
-              const itemDate = new Date(item.date);
-              return itemDate >= monthStart && itemDate <= monthEnd;
-            });
-          } else if (timeFrame === "yearly") {
-            const yearStart = new Date(selectedDate.getFullYear(), 0, 1);
-            const yearEnd = new Date(selectedDate.getFullYear(), 11, 31);
-            filteredDuePaymentResults = allDuePaidResults.filter((item) => {
-              const itemDate = new Date(item.date);
-              return itemDate >= yearStart && itemDate <= yearEnd;
-            });
-          } else if (timeFrame === "custom") {
-            filteredDuePaymentResults = allDuePaidResults.filter((item) => {
-              return (
-                new Date(item.date).toDateString() ===
-                selectedDate.toDateString()
-              );
-            });
-          } else {
-            return res
-              .status(400)
-              .send({ message: "Invalid timeFrame parameter" });
-          }
-          // ------------------------------------------
-          // ---------------Expense start---------------------------
-
-          // Fetch all results without any filter
-          const allExpenseResults = await basic_expense_Collection
-            .find({})
-            .toArray();
-
-          let filteredExpenseResults = [];
-
-          // Filter based on timeFrame
-          if (timeFrame === "daily") {
-            filteredExpenseResults = allExpenseResults.filter((item) => {
-              return (
-                new Date(item.date).toDateString() ===
-                selectedDate.toDateString()
-              );
-            });
-          } else if (timeFrame === "weekly") {
-            const startOfWeek = (date) => {
-              const d = new Date(date);
-              const day = d.getDay();
-              const diff = d.getDate() - day + (day === 0 ? -6 : 1); // adjust when day is sunday
-              return new Date(d.setDate(diff));
-            };
-
-            const endOfWeek = (date) => {
-              const d = new Date(startOfWeek(date));
-              d.setDate(d.getDate() + 6);
-              return d;
-            };
-
-            const weekStart = startOfWeek(selectedDate);
-            const weekEnd = endOfWeek(selectedDate);
-            filteredExpenseResults = allExpenseResults.filter((item) => {
-              const itemDate = new Date(item.date);
-              return itemDate >= weekStart && itemDate <= weekEnd;
-            });
-          } else if (timeFrame === "monthly") {
-            const monthStart = new Date(
-              selectedDate.getFullYear(),
-              selectedDate.getMonth(),
-              1
-            );
-            const monthEnd = new Date(
-              selectedDate.getFullYear(),
-              selectedDate.getMonth() + 1,
-              0
-            );
-            filteredExpenseResults = allExpenseResults.filter((item) => {
-              const itemDate = new Date(item.date);
-              return itemDate >= monthStart && itemDate <= monthEnd;
-            });
-          } else if (timeFrame === "yearly") {
-            const yearStart = new Date(selectedDate.getFullYear(), 0, 1);
-            const yearEnd = new Date(selectedDate.getFullYear(), 11, 31);
-            filteredExpenseResults = allExpenseResults.filter((item) => {
-              const itemDate = new Date(item.date);
-              return itemDate >= yearStart && itemDate <= yearEnd;
-            });
-          } else if (timeFrame === "custom") {
-            filteredExpenseResults = allExpenseResults.filter((item) => {
-              return (
-                new Date(item.date).toDateString() ===
-                selectedDate.toDateString()
-              );
-            });
-          } else {
-            return res
-              .status(400)
-              .send({ message: "Invalid timeFrame parameter" });
-          }
-
-          //------------------------- Expense End-------------------------------------------
-
-          // ----------------------Bank start -------------------------------------------------
-          // ----------------------Bank  end -------------------------------------------------
-
-          const grandTotal = filteredResults?.reduce((acc, item) => {
-            return acc + Number(item?.grand_total || 0);
-          }, 0);
-
-          const profit = filteredResults?.reduce((acc, item) => {
-            return acc + Number(item?.total_profit || 0);
-          }, 0);
-
-          const previouse_due = filteredResults?.reduce((acc, item) => {
-            return acc + Number(item?.previous_due || 0);
-          }, 0);
-
-          const total_due = filteredResults?.reduce((acc, item) => {
-            return acc + Number(item?.total_due || 0);
-          }, 0);
-
-          const paid = filteredResults?.reduce((acc, item) => {
-            return acc + Number(item?.paid || 0);
-          }, 0);
-
-          const due = filteredResults?.reduce((acc, item) => {
-            return acc + Number(item?.due || 0);
-          }, 0);
-
-          const allDuepaid = filteredDuePaymentResults?.reduce((acc, item) => {
-            return acc + Number(item?.paid || 0);
-          }, 0);
-
-          const allExpense = filteredExpenseResults?.reduce((acc, item) => {
-            return acc + Number(item?.amount || 0);
-          }, 0);
-
-          const sell_Info = {
-            grandTotal: grandTotal,
-            profit: profit,
-            previouse_due: previouse_due + allDuepaid,
-            total_due: total_due,
-            paid: paid + allDuepaid,
-            due,
-            allExpense,
-          };
-
-          // Send the filtered result to the frontend
-          res.send(sell_Info);
-        } else {
-          res.status(403).send({
-            message: "Forbidden: Invalid Key",
+        if (!queryDate || !timeFrame) {
+          return res.status(400).send({
+            message: "Date and timeFrame query parameters are required",
           });
         }
+
+        const selectedDate = new Date(queryDate);
+
+        // ------------------- Sells History -----------------------
+
+        const allResults = await sells_history_Collection.find({}).toArray();
+        let filteredResults = filterByTimeFrame(
+          allResults,
+          selectedDate,
+          timeFrame
+        );
+
+        // ------------------- Due Payments -------------------------
+
+        const allDuePaidResults = await due_payment_Collection
+          .find({})
+          .toArray();
+        let filteredDuePaymentResults = filterByTimeFrame(
+          allDuePaidResults,
+          selectedDate,
+          timeFrame
+        );
+
+        // ------------------- Expenses -----------------------------
+
+        const allExpenseResults = await basic_expense_Collection
+          .find({})
+          .toArray();
+        let filteredExpenseResults = filterByTimeFrame(
+          allExpenseResults,
+          selectedDate,
+          timeFrame
+        );
+
+        // ------------------- Bank Information ---------------------
+
+        const bank_name_list = await bank_name_Collection.find({}).toArray();
+        let mainAmount = 0;
+
+        for (const bank of bank_name_list) {
+          const collectionName = bank.collectionName;
+          if (collectionName) {
+            const bank_collection = database.collection(collectionName);
+            const bank_info = await bank_collection.find({}).toArray();
+
+            let totalAmount = 0;
+            let previous_amount = 0;
+            let deposit = 0;
+            let bonus = 0;
+            let withdraw = 0;
+            let bankCost = 0;
+
+            for (const transaction of bank_info) {
+              if (transaction.paymentType === "previous_amount") {
+                previous_amount += transaction.amount;
+              } else if (transaction.paymentType === "deposit") {
+                deposit += transaction.amount;
+              } else if (transaction.paymentType === "bonus") {
+                bonus += transaction.amount;
+              } else if (transaction.paymentType === "withdraw") {
+                withdraw += transaction.amount;
+              } else if (transaction.paymentType === "bankCost") {
+                bankCost += transaction.amount;
+              }
+            }
+
+            totalAmount =
+              previous_amount + deposit + bonus - withdraw - bankCost;
+            mainAmount += totalAmount;
+          }
+        }
+
+        // ------------------- Final Calculation --------------------
+
+        const grandTotal = filteredResults?.reduce(
+          (acc, item) => acc + Number(item?.grand_total || 0),
+          0
+        );
+        const profit = filteredResults?.reduce(
+          (acc, item) => acc + Number(item?.total_profit || 0),
+          0
+        );
+        const previouse_due = filteredResults?.reduce(
+          (acc, item) => acc + Number(item?.previous_due || 0),
+          0
+        );
+        const total_due = filteredResults?.reduce(
+          (acc, item) => acc + Number(item?.total_due || 0),
+          0
+        );
+        const paid = filteredResults?.reduce(
+          (acc, item) => acc + Number(item?.paid || 0),
+          0
+        );
+        const due = filteredResults?.reduce(
+          (acc, item) => acc + Number(item?.due || 0),
+          0
+        );
+        const allDuepaid = filteredDuePaymentResults?.reduce(
+          (acc, item) => acc + Number(item?.paid || 0),
+          0
+        );
+        const allExpense = filteredExpenseResults?.reduce(
+          (acc, item) => acc + Number(item?.amount || 0),
+          0
+        );
+
+        const sell_Info = {
+          grandTotal: grandTotal,
+          profit: profit,
+          previouse_due: previouse_due + allDuepaid,
+          total_due: total_due,
+          paid: paid + allDuepaid,
+          due,
+          allExpense,
+          bankTotal: mainAmount,
+        };
+
+        res.send(sell_Info);
+        // } else {
+        //   res.status(403).send({
+        //     message: "Forbidden: Invalid Key",
+        //   });
+        // }
       } catch (error) {
         res.status(500).send({
           message: "An error occurred while fetching data.",
@@ -1310,6 +1165,69 @@ async function run() {
         });
       }
     });
+
+    // Helper function to filter based on timeFrame
+    function filterByTimeFrame(data, selectedDate, timeFrame) {
+      let filteredData = [];
+
+      if (timeFrame === "daily") {
+        filteredData = data.filter((item) => {
+          return (
+            new Date(item.date).toDateString() === selectedDate.toDateString()
+          );
+        });
+      } else if (timeFrame === "weekly") {
+        const startOfWeek = (date) => {
+          const d = new Date(date);
+          const day = d.getDay();
+          const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+          return new Date(d.setDate(diff));
+        };
+
+        const endOfWeek = (date) => {
+          const d = new Date(startOfWeek(date));
+          d.setDate(d.getDate() + 6);
+          return d;
+        };
+
+        const weekStart = startOfWeek(selectedDate);
+        const weekEnd = endOfWeek(selectedDate);
+        filteredData = data.filter((item) => {
+          const itemDate = new Date(item.date);
+          return itemDate >= weekStart && itemDate <= weekEnd;
+        });
+      } else if (timeFrame === "monthly") {
+        const monthStart = new Date(
+          selectedDate.getFullYear(),
+          selectedDate.getMonth(),
+          1
+        );
+        const monthEnd = new Date(
+          selectedDate.getFullYear(),
+          selectedDate.getMonth() + 1,
+          0
+        );
+        filteredData = data.filter((item) => {
+          const itemDate = new Date(item.date);
+          return itemDate >= monthStart && itemDate <= monthEnd;
+        });
+      } else if (timeFrame === "yearly") {
+        const yearStart = new Date(selectedDate.getFullYear(), 0, 1);
+        const yearEnd = new Date(selectedDate.getFullYear(), 11, 31);
+        filteredData = data.filter((item) => {
+          const itemDate = new Date(item.date);
+          return itemDate >= yearStart && itemDate <= yearEnd;
+        });
+      } else if (timeFrame === "custom") {
+        filteredData = data.filter((item) => {
+          return (
+            new Date(item.date).toDateString() === selectedDate.toDateString()
+          );
+        });
+      }
+
+      return filteredData;
+    }
 
     //  find-expense
     app.get("/find-expense", async (req, res) => {
