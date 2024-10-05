@@ -1133,6 +1133,72 @@ async function run() {
           }
         }
 
+        // ------------------- Supplier Information ---------------------
+        const supplier_name_list = await supplier_name_Collection
+          .find({})
+          .toArray();
+
+        let supplier_due_before_timeFrame = 0; // TimeFrame এর আগের পাওনা
+        let supplier_payment_within_timeFrame = 0; // TimeFrame এর মধ্যে দেয়া পেমেন্ট
+        let supplier_due_at_end_of_timeFrame = 0; // TimeFrame শেষে বকেয়া
+
+        const previousDay = new Date(timeFrameStartDate);
+        previousDay.setDate(previousDay.getDate() - 1); // Get the previous day of timeFrame start
+
+        for (const supplier of supplier_name_list) {
+          const collectionName = supplier.collectionName;
+          if (collectionName) {
+            const supplier_collection = database.collection(collectionName);
+            const supplier_info = await supplier_collection.find({}).toArray();
+
+            let total_bill_before_timeFrame = 0;
+            let total_payment_before_timeFrame = 0;
+
+            let total_bill_within_timeFrame = 0;
+            let total_payment_within_timeFrame = 0;
+
+            for (const transaction of supplier_info) {
+              const transactionDate = new Date(transaction.date);
+
+              // Current timeFrame calculations (timeFrame start date to selected date)
+              if (
+                transactionDate >= timeFrameStartDate &&
+                transactionDate <= selectedDate
+              ) {
+                if (transaction.paymentType === "bill") {
+                  total_bill_within_timeFrame += transaction.amount;
+                } else if (transaction.paymentType === "payment") {
+                  total_payment_within_timeFrame += transaction.amount;
+                }
+              }
+
+              // Previous period before the timeFrame (পাওনার হিসাব)
+              if (transactionDate <= previousDay) {
+                if (transaction.paymentType === "bill") {
+                  total_bill_before_timeFrame += transaction.amount;
+                } else if (transaction.paymentType === "payment") {
+                  total_payment_before_timeFrame += transaction.amount;
+                }
+              }
+            }
+
+            // Calculate due before the timeFrame
+            const due_before_timeFrame =
+              total_bill_before_timeFrame - total_payment_before_timeFrame;
+            supplier_due_before_timeFrame += due_before_timeFrame;
+
+            // Calculate payment within the timeFrame
+            supplier_payment_within_timeFrame += total_payment_within_timeFrame;
+
+            // Calculate due at the end of the timeFrame
+            const due_at_end_of_timeFrame =
+              total_bill_before_timeFrame +
+              total_bill_within_timeFrame -
+              (total_payment_before_timeFrame + total_payment_within_timeFrame);
+            supplier_due_at_end_of_timeFrame += due_at_end_of_timeFrame;
+          }
+        }
+
         // ------------------- Final Calculation --------------------
         const grandTotal = filteredResults?.reduce(
           (acc, item) => acc + Number(item?.grand_total || 0),
@@ -1179,6 +1245,9 @@ async function run() {
           bankPreviousTotal: previousBankTotal, // bank total till the previous day of the timeFrame
           bankDeposit: totalDeposit, // total deposits during the timeFrame (includes 'previous_amount' within timeFrame)
           bankWithdraw: totalWithdraw, // total withdraws during the timeFrame
+          // supplier_due_before_timeFrame, // সাপ্লায়ার পাওনা (timeFrame এর আগের দিন পর্যন্ত)
+          supplier_payment_within_timeFrame, // সাপ্লায়ারকে দিয়েছি (timeFrame এর মধ্যে)
+          supplier_due_at_end_of_timeFrame, // সাপ্লায়ার বকেয়া (timeFrame এর শেষে)
         };
 
         res.send(sell_Info);
@@ -1189,6 +1258,24 @@ async function run() {
         });
       }
     });
+
+    // Helper function to get the start date of the timeFrame
+    function getStartDateForTimeFrame(selectedDate, timeFrame) {
+      let startDate = new Date(selectedDate);
+
+      if (timeFrame === "daily") {
+        startDate.setHours(0, 0, 0, 0);
+      } else if (timeFrame === "weekly") {
+        const dayOfWeek = startDate.getDay();
+        startDate.setDate(startDate.getDate() - dayOfWeek); // Set to the previous Sunday
+      } else if (timeFrame === "monthly") {
+        startDate.setDate(1); // Set to the first day of the month
+      } else if (timeFrame === "yearly") {
+        startDate.setMonth(0, 1); // Set to the first day of the year
+      }
+
+      return startDate;
+    }
 
     // Helper function to get the start date of the timeFrame
     function getStartDateForTimeFrame(selectedDate, timeFrame) {
@@ -1436,8 +1523,6 @@ async function run() {
 
     // find all-supplier-info
     app.get("/all-supplier-info", async (req, res) => {
-      console.log("I am from all supplier");
-
       try {
         // const crose_maching_backend_key = process.env.Front_Backend_Key;
         // const crose_maching_frontend_key =
@@ -2154,7 +2239,6 @@ async function run() {
         const crose_maching_frontend_key = req.body.crose_maching_key;
         if (crose_maching_backend_key == crose_maching_frontend_key) {
           const collectionName = req.body?.name;
-          console.log(collectionName);
 
           const { crose_maching_key, ...data } = req.body;
           const info = {
@@ -2164,8 +2248,6 @@ async function run() {
           const Result = await database
             .collection(collectionName)
             .insertOne(info);
-
-          console.log(Result);
 
           res.send(Result);
         }
@@ -2460,15 +2542,13 @@ async function run() {
     });
 
     // ........................
-    app.get("/update-price-field", async (req, res) => {
-      const updateResult = await storeCollection.updateMany(
-        {}, // Empty filter matches all documents
-        {
-          $rename: { quantity: "store_quantity" },
-        }
-      );
+    app.get("/Sonaly_bank", async (req, res) => {
+      const result = await database
+        .collection("Sonaly_bank")
+        .find({})
+        .toArray();
 
-      res.send("yes");
+      console.log(result);
     });
   } finally {
   }
