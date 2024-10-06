@@ -46,8 +46,8 @@ cloudinary.config({
 
 async function run() {
   try {
-    const database = client.db("check-m-e-1");
-    // const database = client.db("check-mariam-enter-mirzapur");
+    // const database = client.db("check-m-e-1");
+    const database = client.db("check-mariam-enter-mirzapur");
     const adminCollection = database.collection("admin");
     const productCollection = database.collection("products");
     const orderCollection = database.collection("orders");
@@ -64,6 +64,8 @@ async function run() {
     const supplier_name_Collection = database.collection(
       "supplier-name-collection"
     );
+    const hand_Pocket_Cash_Collection = database.collection("hand-pocket-cash");
+    const cash_box_Collection = database.collection("cash-box");
 
     //------------- find admin by login email
     app.get("/users/admin/:email", async (req, res) => {
@@ -1161,7 +1163,6 @@ async function run() {
               // পূর্বের ঋণ (timeFrame এর আগের দিন পর্যন্ত)
               if (transactionDate < timeFrameStartDate) {
                 if (transaction.paymentType === "debt_repayment") {
-                  console.log(transaction.amount);
                   previousDebtAmount += transaction.amount; // debt_repayment amount will be subtracted
                 }
                 if (transaction?.willBePaidAmount) {
@@ -1172,7 +1173,6 @@ async function run() {
               // বর্তমান ঋণ (timeFrame এর মধ্যে)
               if (transactionDate <= selectedDate) {
                 if (transaction.paymentType === "debt_repayment") {
-                  console.log(transaction.amount);
                   currentDebtAmount += transaction.amount; // debt_repayment amount will be subtracted
                 }
                 if (transaction?.willBePaidAmount) {
@@ -1211,7 +1211,6 @@ async function run() {
         let supplier_due_at_end_of_timeFrame = 0; // TimeFrame শেষে বকেয়া
 
         const previousDay = new Date(timeFrameStartDate);
-        previousDay.setDate(previousDay.getDate() - 1); // Get the previous day of timeFrame start
 
         for (const supplier of supplier_name_list) {
           const collectionName = supplier.collectionName;
@@ -1241,7 +1240,7 @@ async function run() {
               }
 
               // Previous period before the timeFrame (পাওনার হিসাব)
-              if (transactionDate <= previousDay) {
+              if (transactionDate <= selectedDate) {
                 if (transaction.paymentType === "bill") {
                   total_bill_before_timeFrame += transaction.amount;
                 } else if (transaction.paymentType === "payment") {
@@ -1260,12 +1259,67 @@ async function run() {
 
             // Calculate due at the end of the timeFrame
             const due_at_end_of_timeFrame =
-              total_bill_before_timeFrame +
-              total_bill_within_timeFrame -
-              (total_payment_before_timeFrame + total_payment_within_timeFrame);
+              total_bill_before_timeFrame - total_payment_before_timeFrame;
+
             supplier_due_at_end_of_timeFrame += due_at_end_of_timeFrame;
           }
         }
+
+        // ------------------- final Cash Flow Array -----------------------------
+        const finalCashFlowArray = await hand_Pocket_Cash_Collection
+          .find({})
+          .toArray();
+        // Filtered final cash flow using the end of the timeFrame
+        let filteredFinalCashFlow = filterByTimeFrame(
+          finalCashFlowArray,
+          selectedDate,
+          timeFrame
+        );
+        console.log(finalCashFlowArray);
+
+        // Initialize variables to hold the total amounts for each payment type
+        let allSell = 0;
+        let allLoan = 0;
+        let allWithdraw = 0;
+        let allDeposit = 0;
+        let allDebtRepayment = 0;
+        let allPayment = 0;
+        let Previouse_amount = 0;
+
+        // Iterate through the filtered cash flow array and calculate totals
+        filteredFinalCashFlow.forEach((object) => {
+          if (object.paymentType === "sell") {
+            allSell += object.amount || 0; // Safeguard against undefined
+          }
+          if (object.paymentType === "loan") {
+            allLoan += object.amount || 0;
+          }
+          if (object.paymentType === "withdraw") {
+            allWithdraw += object.amount || 0;
+          }
+          if (object.paymentType === "deposit") {
+            allDeposit += object.amount || 0;
+          }
+          if (object.paymentType === "debt_repayment") {
+            allDebtRepayment += object.amount || 0;
+          }
+          if (object.paymentType === "payment") {
+            allPayment += object.amount || 0;
+          }
+          if (object.paymentType === "Previouse_amount") {
+            Previouse_amount += object.amount || 0;
+          }
+        });
+
+        // Calculate final cash flow
+        const final_Cash_Flow =
+          Previouse_amount +
+          allSell +
+          allLoan +
+          allWithdraw -
+          allDeposit -
+          allDebtRepayment -
+          allPayment;
 
         // ------------------- Final Calculation --------------------
         const grandTotal = filteredResults?.reduce(
@@ -1323,6 +1377,7 @@ async function run() {
           bankCost, // (timeFrame এর মধ্যে)
           fine, // (timeFrame এর মধ্যে)
           bonus, //(timeFrame এর মধ্যে)
+          final_Cash_Flow,
         };
 
         res.send(sell_Info);
@@ -1644,6 +1699,43 @@ async function run() {
 
     app.get("/all-bank-info-for-check", async (req, res) => {
       try {
+      } catch (error) {
+        res.status(500).send({
+          message: "An error occurred while fetching data.",
+          error,
+        });
+      }
+    });
+
+    // find all hand-cash transcation
+    app.get("/hand-cash-trascation", async (req, res) => {
+      try {
+        const crose_maching_backend_key = process.env.Front_Backend_Key;
+        const crose_maching_frontend_key =
+          req.headers.authorization?.split(" ")[1];
+
+        if (crose_maching_backend_key === crose_maching_frontend_key) {
+          const result = await hand_Pocket_Cash_Collection.find({}).toArray();
+          res.send(result);
+        }
+      } catch (error) {
+        res.status(500).send({
+          message: "An error occurred while fetching data.",
+          error,
+        });
+      }
+    });
+    // find all cash box transcation
+    app.get("/cash-box-trascation", async (req, res) => {
+      try {
+        const crose_maching_backend_key = process.env.Front_Backend_Key;
+        const crose_maching_frontend_key =
+          req.headers.authorization?.split(" ")[1];
+
+        if (crose_maching_backend_key === crose_maching_frontend_key) {
+          const result = await cash_box_Collection.find({}).toArray();
+          res.send(result);
+        }
       } catch (error) {
         res.status(500).send({
           message: "An error occurred while fetching data.",
@@ -2325,6 +2417,15 @@ async function run() {
             .insertOne(info);
 
           res.send(Result);
+
+          if (
+            data?.paymentType === "loan" ||
+            data?.paymentType === "deposit" ||
+            data?.paymentType === "withdraw" ||
+            data?.paymentType === "debt_repayment"
+          ) {
+            const Result = await hand_Pocket_Cash_Collection.insertOne(info);
+          }
         }
       } catch (error) {
         console.error("Error handling product add:", error);
@@ -2338,7 +2439,6 @@ async function run() {
         const crose_maching_frontend_key = req.body.crose_maching_key;
         if (crose_maching_backend_key == crose_maching_frontend_key) {
           const collectionName = req.body?.name;
-          console.log(collectionName);
 
           const { crose_maching_key, ...data } = req.body;
           const info = {
@@ -2349,9 +2449,108 @@ async function run() {
             .collection(collectionName)
             .insertOne(info);
 
-          console.log(Result);
-
           res.send(Result);
+
+          if (data?.paymentType === "payment") {
+            const Result = await hand_Pocket_Cash_Collection.insertOne(info);
+          }
+        }
+      } catch (error) {
+        console.error("Error handling product add:", error);
+        res.status(500).send("Server Error");
+      }
+    });
+
+    // ------------------    hand_Pocket_Cash_Collection    ---------------------
+    app.post("/hand-cash-deposit-withdrow", async (req, res) => {
+      try {
+        const crose_maching_backend_key = `${process.env.Front_Backend_Key}`;
+        const crose_maching_frontend_key = req.body.crose_maching_key;
+        if (crose_maching_backend_key == crose_maching_frontend_key) {
+          const { crose_maching_key, ...handCashData } = req.body;
+
+          const info = {
+            ...handCashData,
+          };
+          const handCashResult = await hand_Pocket_Cash_Collection.insertOne(
+            info
+          );
+          res.send(handCashResult);
+        }
+      } catch (error) {
+        console.error("Error handling product add:", error);
+        res.status(500).send("Server Error");
+      }
+    });
+
+    // ------------------    hand-cash-deposit-withdrow-every-sell  ---------------------
+    app.post("/hand-cash-deposit-withdrow-every-sell", async (req, res) => {
+      try {
+        const crose_maching_backend_key = `${process.env.Front_Backend_Key}`;
+        const crose_maching_frontend_key = req.body.crose_maching_key;
+
+        if (crose_maching_backend_key === crose_maching_frontend_key) {
+          const { crose_maching_key, amount, ...handCashData } = req.body;
+
+          const info = {
+            amount,
+            ...handCashData,
+          };
+
+          const currentDate = new Date();
+          const dateOnly = currentDate.toISOString().split("T")[0];
+
+          const findQuery = {
+            date: dateOnly,
+            paymentType: "sell",
+          };
+
+          const ifExist = await hand_Pocket_Cash_Collection.findOne(findQuery);
+
+          if (ifExist) {
+            const options = { upsert: true };
+            const updateFilter = { _id: ifExist._id };
+            const updateDoc = {
+              $set: {
+                amount: amount,
+              },
+            };
+            // Update the document in the collection
+            const updateResult = await hand_Pocket_Cash_Collection.updateOne(
+              updateFilter,
+              updateDoc,
+              options
+            );
+            res.send(updateResult);
+          } else {
+            // If it doesn't exist, insert the new record
+            const handCashResult = await hand_Pocket_Cash_Collection.insertOne(
+              info
+            );
+            res.send(handCashResult);
+          }
+        } else {
+          res.status(403).send("Unauthorized access");
+        }
+      } catch (error) {
+        console.error("Error handling product add:", error);
+        res.status(500).send("Server Error");
+      }
+    });
+
+    // ------------------    cash box _Collection    ---------------------
+    app.post("/cash-box-deposit-withdrow", async (req, res) => {
+      try {
+        const crose_maching_backend_key = `${process.env.Front_Backend_Key}`;
+        const crose_maching_frontend_key = req.body.crose_maching_key;
+        if (crose_maching_backend_key == crose_maching_frontend_key) {
+          const { crose_maching_key, ...handCashData } = req.body;
+
+          const info = {
+            ...handCashData,
+          };
+          const handCashResult = await cash_box_Collection.insertOne(info);
+          res.send(handCashResult);
         }
       } catch (error) {
         console.error("Error handling product add:", error);
@@ -2622,8 +2821,6 @@ async function run() {
         .collection("Sonaly_bank")
         .find({})
         .toArray();
-
-      console.log(result);
     });
   } finally {
   }
