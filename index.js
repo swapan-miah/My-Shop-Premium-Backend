@@ -1064,6 +1064,7 @@ async function run() {
 
         // ------------------- Bank Information ---------------------
         const bank_name_list = await bank_name_Collection.find({}).toArray();
+
         let mainAmount = 0;
         let previousBankTotal = 0;
         let totalDeposit = 0;
@@ -1077,6 +1078,7 @@ async function run() {
 
         for (const bank of bank_name_list) {
           const collectionName = bank.collectionName;
+
           if (collectionName) {
             const bank_collection = database.collection(collectionName);
             const bank_info = await bank_collection.find({}).toArray();
@@ -1087,7 +1089,6 @@ async function run() {
             let bonus = 0;
             let withdraw = 0;
             let bankCost = 0;
-            let fine1 = 0;
 
             for (const transaction of bank_info) {
               const transactionDate = new Date(transaction.date);
@@ -1105,8 +1106,6 @@ async function run() {
                   withdraw += transaction.amount;
                 } else if (transaction.paymentType === "bankCost") {
                   bankCost += transaction.amount;
-                } else if (transaction.paymentType === "fine") {
-                  fine1 += transaction.amount;
                 }
               }
 
@@ -1122,16 +1121,28 @@ async function run() {
                   previous_amount -= transaction.amount; // Withdrawals reduce the total
                 } else if (transaction.paymentType === "bankCost") {
                   previous_amount -= transaction.amount;
-                } else if (transaction.paymentType === "fine") {
-                  previous_amount -= transaction.amount;
+                }
+              }
+
+              // selected time bank total
+              if (transactionDate <= selectedDate) {
+                if (transaction.paymentType === "previous_amount") {
+                  totalAmount += transaction.amount;
+                } else if (transaction.paymentType === "deposit") {
+                  totalAmount += transaction.amount;
+                } else if (transaction.paymentType === "bonus") {
+                  totalAmount += transaction.amount;
+                } else if (transaction.paymentType === "withdraw") {
+                  totalAmount -= transaction.amount; // Withdrawals reduce the total
+                } else if (transaction.paymentType === "bankCost") {
+                  totalAmount -= transaction.amount;
                 }
               }
             }
 
             // Bank calculations
             // ব্যাংকে ছিল = timeFrame এর আগের দিন পর্যন্ত previous_amount + deposit + bonus - withdraw - bankCost - fine;
-            totalAmount =
-              previous_amount + deposit + bonus - withdraw - bankCost - fine1;
+
             mainAmount += totalAmount;
             previousBankTotal += previous_amount;
             totalDeposit += deposit + bonus; // totalDeposit includes 'previous_amount' if it falls within the timeFrame
@@ -1140,12 +1151,13 @@ async function run() {
         }
 
         // ................... bank others info .............
-        let previousDebt = 0;
-        let currentDebt = 0;
+
         let debtPaid_by_timeFrame = 0;
         let bankCost = 0;
         let fine = 0;
         let bonus = 0;
+        let previousDebtTotal = 0; // মোট previousDebt অ্যাকিউমুলেট করার জন্য
+        let currentDebtTotal = 0; // মোট currentDebt অ্যাকিউমুলেট করার জন্য
 
         for (const bank of bank_name_list) {
           const collectionName = bank.collectionName;
@@ -1154,10 +1166,11 @@ async function run() {
             const bank_collection = database.collection(collectionName);
             const bank_info = await bank_collection.find({}).toArray();
 
-            // This is where the error occurs, remove the second 'let previousDebt' declaration
-            let previousDebtAmount = 0; // Just declare this one for specific scope
+            // ব্যাংকের প্রতিটি ট্রানজেকশনের জন্য অ্যাকিউমুলেট করা মান
+            let previousDebtAmount = 0;
             let willBePaidAmount = 0;
-
+            let previousFine = 0;
+            let currentFine = 0;
             let currentDebtAmount = 0;
             let current_willBePaidAmount = 0;
 
@@ -1172,6 +1185,9 @@ async function run() {
                 if (transaction?.willBePaidAmount) {
                   willBePaidAmount += transaction.willBePaidAmount;
                 }
+                if (transaction.paymentType === "fine") {
+                  previousFine += transaction.amount; // পূর্বের fine এখানে অ্যাকিউমুলেট করা হচ্ছে
+                }
               }
 
               // বর্তমান ঋণ (timeFrame এর মধ্যে)
@@ -1182,8 +1198,12 @@ async function run() {
                 if (transaction?.willBePaidAmount) {
                   current_willBePaidAmount += transaction.willBePaidAmount;
                 }
+                if (transaction.paymentType === "fine") {
+                  currentFine += transaction.amount; // বর্তমান fine এখানে অ্যাকিউমুলেট করা হচ্ছে
+                }
               }
-              // বর্তমান ঋণ (timeFrame এর মধ্যে)
+
+              // অন্যান্য ট্রানজেকশন (timeFrame এর মধ্যে)
               if (
                 transactionDate >= timeFrameStartDate &&
                 transactionDate <= selectedDate
@@ -1200,10 +1220,21 @@ async function run() {
               }
             }
 
-            previousDebt = willBePaidAmount - previousDebtAmount;
-            currentDebt = current_willBePaidAmount - currentDebtAmount;
+            // প্রতিটি ব্যাংকের জন্য হিসাব কনসোল এ দেখানো হচ্ছে
+            const previousDebt =
+              willBePaidAmount - previousDebtAmount + previousFine;
+            const currentDebt =
+              current_willBePaidAmount - currentDebtAmount + currentFine;
+
+            // মোট previousDebt এবং currentDebt আপডেট করা হচ্ছে
+            previousDebtTotal += previousDebt;
+            currentDebtTotal += currentDebt;
           }
         }
+
+        // লুপের শেষে মোট previousDebt এবং currentDebt প্রদর্শন করা হচ্ছে
+        console.log("Total Previous Debt:", previousDebtTotal);
+        console.log("Total Current Debt:", currentDebtTotal);
 
         // ------------------- Supplier Information ---------------------
         const supplier_name_list = await supplier_name_Collection
@@ -1287,8 +1318,6 @@ async function run() {
           const transactionDate = new Date(object.date);
 
           if (transactionDate <= selectedDate) {
-            console.log("selectedDate", selectedDate);
-            console.log("transactionDate", transactionDate);
             if (object.paymentType === "sell") {
               allSell += object.amount || 0; // Safeguard against undefined
             }
@@ -1373,8 +1402,8 @@ async function run() {
           supplier_payment_within_timeFrame, // সাপ্লায়ারকে দিয়েছি (timeFrame এর মধ্যে)
           supplier_due_at_end_of_timeFrame, // সাপ্লায়ার বকেয়া (timeFrame এর শেষে)
 
-          previousDebt, // পূর্বের ঋণ (timeFrame এর আগের দিন পর্যন্ত)
-          currentDebt, // বর্তমান ঋণ (timeFrame এর মধ্যে)
+          previousDebtTotal, // পূর্বের ঋণ (timeFrame এর আগের দিন পর্যন্ত)
+          currentDebtTotal, // বর্তমান ঋণ (timeFrame এর মধ্যে)
           debtPaid_by_timeFrame, // (timeFrame এর মধ্যে)
           bankCost, // (timeFrame এর মধ্যে)
           fine, // (timeFrame এর মধ্যে)
