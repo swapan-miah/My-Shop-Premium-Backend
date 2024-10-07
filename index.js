@@ -1068,6 +1068,7 @@ async function run() {
         let previousBankTotal = 0;
         let totalDeposit = 0;
         let totalWithdraw = 0;
+        let fine1 = 0;
 
         const timeFrameStartDate = getStartDateForTimeFrame(
           selectedDate,
@@ -1086,6 +1087,7 @@ async function run() {
             let bonus = 0;
             let withdraw = 0;
             let bankCost = 0;
+            let fine1 = 0;
 
             for (const transaction of bank_info) {
               const transactionDate = new Date(transaction.date);
@@ -1103,10 +1105,8 @@ async function run() {
                   withdraw += transaction.amount;
                 } else if (transaction.paymentType === "bankCost") {
                   bankCost += transaction.amount;
-                }
-                // If it's 'previous_amount' within the timeFrame, add it to totalDeposit
-                else if (transaction.paymentType === "previous_amount") {
-                  deposit += transaction.amount;
+                } else if (transaction.paymentType === "fine") {
+                  fine1 += transaction.amount;
                 }
               }
 
@@ -1122,12 +1122,16 @@ async function run() {
                   previous_amount -= transaction.amount; // Withdrawals reduce the total
                 } else if (transaction.paymentType === "bankCost") {
                   previous_amount -= transaction.amount;
+                } else if (transaction.paymentType === "fine") {
+                  previous_amount -= transaction.amount;
                 }
               }
             }
 
+            // Bank calculations
+            // ব্যাংকে ছিল = timeFrame এর আগের দিন পর্যন্ত previous_amount + deposit + bonus - withdraw - bankCost - fine;
             totalAmount =
-              previous_amount + deposit + bonus - withdraw - bankCost;
+              previous_amount + deposit + bonus - withdraw - bankCost - fine1;
             mainAmount += totalAmount;
             previousBankTotal += previous_amount;
             totalDeposit += deposit + bonus; // totalDeposit includes 'previous_amount' if it falls within the timeFrame
@@ -1269,13 +1273,6 @@ async function run() {
         const finalCashFlowArray = await hand_Pocket_Cash_Collection
           .find({})
           .toArray();
-        // Filtered final cash flow using the end of the timeFrame
-        let filteredFinalCashFlow = filterByTimeFrame(
-          finalCashFlowArray,
-          selectedDate,
-          timeFrame
-        );
-        console.log(finalCashFlowArray);
 
         // Initialize variables to hold the total amounts for each payment type
         let allSell = 0;
@@ -1286,30 +1283,35 @@ async function run() {
         let allPayment = 0;
         let Previouse_amount = 0;
 
-        // Iterate through the filtered cash flow array and calculate totals
-        filteredFinalCashFlow.forEach((object) => {
-          if (object.paymentType === "sell") {
-            allSell += object.amount || 0; // Safeguard against undefined
+        for (const object of finalCashFlowArray) {
+          const transactionDate = new Date(object.date);
+
+          if (transactionDate <= selectedDate) {
+            console.log("selectedDate", selectedDate);
+            console.log("transactionDate", transactionDate);
+            if (object.paymentType === "sell") {
+              allSell += object.amount || 0; // Safeguard against undefined
+            }
+            if (object.paymentType === "loan") {
+              allLoan += object.amount || 0;
+            }
+            if (object.paymentType === "withdraw") {
+              allWithdraw += object.amount || 0;
+            }
+            if (object.paymentType === "deposit") {
+              allDeposit += object.amount || 0;
+            }
+            if (object.paymentType === "debt_repayment") {
+              allDebtRepayment += object.amount || 0;
+            }
+            if (object.paymentType === "payment") {
+              allPayment += object.amount || 0;
+            }
+            if (object.paymentType === "Previouse_amount") {
+              Previouse_amount += object.amount || 0;
+            }
           }
-          if (object.paymentType === "loan") {
-            allLoan += object.amount || 0;
-          }
-          if (object.paymentType === "withdraw") {
-            allWithdraw += object.amount || 0;
-          }
-          if (object.paymentType === "deposit") {
-            allDeposit += object.amount || 0;
-          }
-          if (object.paymentType === "debt_repayment") {
-            allDebtRepayment += object.amount || 0;
-          }
-          if (object.paymentType === "payment") {
-            allPayment += object.amount || 0;
-          }
-          if (object.paymentType === "Previouse_amount") {
-            Previouse_amount += object.amount || 0;
-          }
-        });
+        }
 
         // Calculate final cash flow
         const final_Cash_Flow =
@@ -1388,42 +1390,6 @@ async function run() {
         });
       }
     });
-
-    // Helper function to get the start date of the timeFrame
-    function getStartDateForTimeFrame(selectedDate, timeFrame) {
-      let startDate = new Date(selectedDate);
-
-      if (timeFrame === "daily") {
-        startDate.setHours(0, 0, 0, 0);
-      } else if (timeFrame === "weekly") {
-        const dayOfWeek = startDate.getDay();
-        startDate.setDate(startDate.getDate() - dayOfWeek); // Set to the previous Sunday
-      } else if (timeFrame === "monthly") {
-        startDate.setDate(1); // Set to the first day of the month
-      } else if (timeFrame === "yearly") {
-        startDate.setMonth(0, 1); // Set to the first day of the year
-      }
-
-      return startDate;
-    }
-
-    // Helper function to get the start date of the timeFrame
-    function getStartDateForTimeFrame(selectedDate, timeFrame) {
-      let startDate = new Date(selectedDate);
-
-      if (timeFrame === "daily") {
-        startDate.setHours(0, 0, 0, 0);
-      } else if (timeFrame === "weekly") {
-        const dayOfWeek = startDate.getDay();
-        startDate.setDate(startDate.getDate() - dayOfWeek); // Set to the previous Sunday
-      } else if (timeFrame === "monthly") {
-        startDate.setDate(1); // Set to the first day of the month
-      } else if (timeFrame === "yearly") {
-        startDate.setMonth(0, 1); // Set to the first day of the year
-      }
-
-      return startDate;
-    }
 
     // Helper function to get the start date of the timeFrame
     function getStartDateForTimeFrame(selectedDate, timeFrame) {
